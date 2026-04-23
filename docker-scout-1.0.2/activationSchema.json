@@ -1,0 +1,321 @@
+{
+  "types": {
+    "features": {
+      "type": "object",
+      "displayName": "Choose product to integrate:",
+      "properties": {
+        "collectDockerScoutSecurityEvents": {
+          "displayName": "Collect Docker Scout security events",
+          "documentation": "The extension will discover container images stored on Docker Hub, then run Docker Scout CVEs and SBOM commands to scan the images for vulnerabilities. Generated vulnerability findings and scan events will be ingested into Dynatrace.",
+          "description": "Important: The [Docker CLI](https://docs.docker.com/scout/install/) must be installed on the [ActiveGate](https://docs.dynatrace.com/docs/ingest-from/dynatrace-activegate) before enabling this extension.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "displayName": "Docker Scout configuration",
+      "documentation": "Configure Docker Hub authentication and which organizations/repositories to scan. Docker Hub API and Docker Scout CLI use username and Personal Access Token (PAT).",
+      "properties": {
+        "dockerHubUsername": {
+          "displayName": "Docker Hub username",
+          "documentation": "Docker Hub username is required to authenticate with Docker Hub. It is used both for API access and for running the `docker login` command. This allows Docker Scout to securely pull and scan your container images.",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide the Docker Hub username"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "dockerHubApiSecret": {
+          "displayName": "Docker Hub personal access token (PAT)",
+          "documentation": "Docker Hub personal access token. For more information, see [Create a personal access token](https://docs.docker.com/security/access-tokens/#create-a-personal-access-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide your Docker Hub PAT"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "repositories": {
+          "displayName": "",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/repositories"
+          }
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace",
+      "properties": {
+        "useCredentialVault": {
+          "displayName": "Use credential vault for Dynatrace authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for Dynatrace authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "displayName": "Dynatrace API access token",
+          "description": "For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": false
+          }
+        },
+        "useCustomSecurityIngestUrl": {
+          "type": "boolean",
+          "displayName": "Use custom security events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/security.events` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatraceSecurityIngestUrl": {
+          "displayName": "(Optional) Dynatrace security events endpoint",
+          "description": "If not set, the default endpoint is used.",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest).",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCustomSecurityIngestUrl",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "repositories": {
+      "type": "object",
+      "displayName": "",
+      "description": "",
+      "summaryPattern": "",
+      "properties": {
+        "allOrgsAndRepos": {
+          "displayName": "Collect from all organizations",
+          "documentation": "When enabled, the extension will discover and scan container images for all organizations accessible to the configured Docker Hub user. When disabled, users can specify and limit which organizations and repositories are scanned.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "orgList": {
+          "displayName": "Organizations",
+          "description": "Partial matches are allowed to identify multiple organizations.",
+          "type": "list",
+          "nullable": false,
+          "precondition": {
+            "type": "EQUALS",
+            "expectedValue": false,
+            "property": "allOrgsAndRepos"
+          },
+          "items": {
+            "type": "text",
+            "displayName": "Org filter",
+            "metadata": {
+              "placeholder": "my-org"
+            }
+          },
+          "metadata": {
+            "addItemButton": "Add organization filter"
+          }
+        },
+        "allReposInSelectedOrgs": {
+          "displayName": "Collect from all repositories",
+          "documentation": "When enabled, the extension will discover and scan container images from all the repositories in each selected organization. When disabled, users can specify and limit which repositories are scanned.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true,
+          "precondition": {
+            "type": "EQUALS",
+            "expectedValue": false,
+            "property": "allOrgsAndRepos"
+          }
+        },
+        "repoList": {
+          "displayName": "Repositories",
+          "description": "Partial matches or org/repo format (e.g. my-org/my-repo) to identify repositories.",
+          "documentation": "Partial matches or org/repo format (e.g. my-org/my-repo). Add repository filters to limit which repositories are scanned.",
+          "type": "list",
+          "nullable": false,
+          "precondition": {
+            "type": "EQUALS",
+            "expectedValue": false,
+            "property": "allReposInSelectedOrgs"
+          },
+          "items": {
+            "type": "text",
+            "displayName": "Repo filter",
+            "metadata": {
+              "placeholder": "my-org/my-repo"
+            }
+          },
+          "metadata": {
+            "addItemButton": "Add repository filter"
+          }
+        }
+      }
+    },
+    "advancedOptions": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "securityFindingsFrequencyHours": {
+          "displayName": "Security findings ingest frequency",
+          "description": "How often images will be discovered, scanned with Docker Scout, and security findings sent to Dynatrace.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "debugLogs": {
+          "displayName": "Enable extension debug logs",
+          "description": "Enable verbose logging for troubleshooting.",
+          "documentation": "Enable verbose logging for troubleshooting. Use when diagnosing connection or ingestion issues.",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "pythonRemote": {
+      "type": "object",
+      "displayName": "Docker Scout integration",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "connection": {
+          "displayName": "Docker Scout configuration",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/connection"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advancedOptions": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advancedOptions"
+          }
+        }
+      }
+    },
+    "pythonLocal": {
+      "type": "object",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "connection": {
+          "displayName": "Docker Scout configuration",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/connection"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advancedOptions": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advancedOptions"
+          }
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "Docker Scout integration for Dynatrace. Discovers container images from Docker Hub, runs Docker Scout CVES and SBOM scans, and ingests vulnerability findings and scan events as security events.",
+  "schemaId": "python-extension.activation",
+  "displayName": "Docker Scout integration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": ["tenant"],
+  "multiObject": false,
+  "properties": {
+    "pythonLocal": {
+      "displayName": "Python Local Extension",
+      "type": {
+        "$ref": "#/types/pythonLocal"
+      }
+    },
+    "pythonRemote": {
+      "displayName": "Python Remote Extension",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  }
+}

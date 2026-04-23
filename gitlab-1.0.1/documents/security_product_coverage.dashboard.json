@@ -1,0 +1,1218 @@
+{
+	"version": 21,
+	"variables": [
+		{
+			"version": 2,
+			"key": "Provider",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(event.provider)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "Product",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n| filter in(event.provider,$Provider)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(product.name)))\n| fields values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "AffectedObjectType",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(object.type)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else: \"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "EventType",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(event.type)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else: \"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		}
+	],
+	"tiles": {
+		"1": {
+			"type": "markdown",
+			"content": "# Security product coverage\n\nOverview of the security product coverage across various objects and entities. Learn more about [Security events ingest](https://dt-url.net/1d63p0v)."
+		},
+		"19": {
+			"type": "markdown",
+			"content": "## Coverage overview\nDistribution of security findings by reporting products and the corresponding affected object types."
+		},
+		"30": {
+			"title": "Security events per top 10 products",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize {\n    Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n    Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"}))\n  }, by:{Product=product.name}\n| sort Findings desc\n| limit 10",
+			"visualization": "categoricalBarChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "Product",
+						"categoryAxis": [
+							"Product"
+						],
+						"valueAxis": [
+							"Findings",
+							"Scans"
+						],
+						"valueAxisLabel": "Findings,Scans"
+					}
+				},
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"31": {
+			"title": "Ingested finding events by provider over time",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n  AND in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})\n// filter for events fitting the SD requirements\n| filterOut isNull(finding.id) OR isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| makeTimeseries count(default:0), time:{timestamp}, by:{event.provider}",
+			"visualization": "barChart",
+			"visualizationSettings": {
+				"dataMapping": {
+					"displayedFields": [
+						"event.provider"
+					]
+				},
+				"chartSettings": {
+					"truncationMode": "middle",
+					"xAxisLabel": "timeframe",
+					"fieldMapping": {
+						"leftAxisValues": [
+							"count(default:0)"
+						],
+						"timestamp": "timeframe"
+					}
+				},
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"32": {
+			"title": "Scan events",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n  AND in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})\n// filter for events fitting the SD requirements\n| filterOut isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize count()",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "count()",
+					"recordField": "count()",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false
+					}
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"33": {
+			"title": "Reporting providers",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize Products=countDistinctExact(event.provider)",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "count()",
+					"recordField": "Products",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false
+					}
+				},
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"34": {
+			"title": "Ingested scan events over time",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n  AND in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})\n// filter for events fitting the SD requirements\n| filterOut isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| makeTimeseries count(default:0), time:{timestamp}, by:{event.provider}",
+			"visualization": "barChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"xAxisLabel": "timeframe",
+					"fieldMapping": {
+						"leftAxisValues": [
+							"count(default:0)"
+						],
+						"timestamp": "timeframe"
+					}
+				},
+				"dataMapping": {
+					"displayedFields": [
+						"event.provider"
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"35": {
+			"title": "Finding events",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n  AND in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})\n// filter for events fitting the SD requirements\n| filterOut isNull(object.id) or isNull(finding.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize count()",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "count()",
+					"recordField": "count()",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false
+					}
+				},
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"36": {
+			"title": "Security events by object coverage per product",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize {\n    Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n    Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})),\n    Objects=countDistinctExact(object.id),\n    `Covered types`=collectDistinct(object.type)\n  }, by:{Product=product.name}\n| sort Objects desc",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"37": {
+			"title": "Security events by findings number per object type",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize {\n    Objects=countDistinctExact(object.id),\n    Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n    Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})),\n    Products=countDistinctExact(product.name),\n    Names=collectDistinct(product.name)\n  }, by:{Type=object.type}\n| sort Findings desc",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"columnOrder": [
+						"[\"Type\"]",
+						"[\"Objects\"]",
+						"[\"Findings\"]",
+						"[\"Scans\"]",
+						"[\"Products\"]",
+						"[\"Names\"]"
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"38": {
+			"type": "markdown",
+			"content": "## Runtime entity coverage: Hosts\nDynatrace-monitored host entities covered by the various ingested findings."
+		},
+		"39": {
+			"title": "Security events per top 10 object types",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| summarize {\n    Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n    Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"}))\n  }, by:{`Object type`=object.type}\n| sort Findings desc\n| limit 10",
+			"visualization": "categoricalBarChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "Object type",
+						"categoryAxis": [
+							"Object type"
+						],
+						"valueAxis": [
+							"Findings",
+							"Scans"
+						],
+						"valueAxisLabel": "Findings,Scans"
+					}
+				},
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"40": {
+			"type": "markdown",
+			"content": "## Runtime entity coverage: Container workloads\nDynatrace-monitored container workload entities covered by the various ingested findings."
+		},
+		"41": {
+			"title": "Container workload coverage",
+			"type": "data",
+			"query": "smartscapeNodes {K8S_DEPLOYMENT, K8S_CRONJOB, K8S_DAEMONSET, K8S_JOB, K8S_STATEFULSET, K8S_REPLICASET}\n| fields id, containerNames=name, dt.source_entity=id_classic, workloadName=k8s.workload.name\n| join [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  | filter exists(dt.smartscape_source.id)\n  // dashboard variables\n  | filter (in(event.provider, $Provider))\n   AND (isNull(product.name) OR in(product.name, $Product))\n   AND (in(object.type, $AffectedObjectType))\n   AND (in(event.type,$EventType))\n  | dedup dt.smartscape_source.id, event.provider, product.name\n  | fields dt.smartscape_source.id, event.provider, product.name\n], kind:leftouter, on:{left[id]==right[dt.smartscape_source.id]}, \n   fields:{\n     event.provider, product.name, dt.smartscape_source.id\n   }\n| append [\n  fetch dt.entity.container_group_instance\n  | fields containerImageDigest, containerNames, container_group.id=instance_of[dt.entity.container_group], \n           workload.id=belongs_to[dt.entity.cloud_application], workloadName\n  | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n  | join [\n    fetch security.events\n    | filter dt.system.bucket == \"default_securityevents\"\n    | filter isNotNull(container_image.digest)\n    // dashboard variables\n    | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n    | dedup event.provider, product.name, container_image.digest\n    | fields event.provider, product.name, container_image.digest\n  ], kind:leftOuter, on:{left[containerImageDigest]==right[container_image.digest]}, \n    fields:{\n     event.provider, product.name, container_image.digest\n    }\n]\n| append [\n  fetch dt.entity.container_group_instance\n  | fields containerImageId, containerNames, container_group.id=instance_of[dt.entity.container_group], \n           workload.id=belongs_to[dt.entity.cloud_application], workloadName\n  | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n  | join [\n    fetch security.events\n    | filter dt.system.bucket == \"default_securityevents\"\n    | filter isNotNull(container_image.id)\n    // dashboard variables\n    | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n    | dedup event.provider, product.name, container_image.id\n    | fields event.provider, product.name, container_image.id\n  ], kind:leftOuter, on:{left[containerImageId]==right[container_image.id]}, \n    fields:{\n      event.provider, product.name, container_image.digest=container_image.id\n    }\n]\n| fieldsAdd covered=if(isNotNull(container_image.digest) or isNotNull(dt.smartscape_source.id), \"Covered\", else:\"Not covered\")\n| summarize {\n  Entities=countDistinctExact(dt.source_entity)\n}, by:{covered}",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"circleChartSettings": {
+						"valueType": "relative",
+						"showTotalValue": true,
+						"groupingThresholdType": "relative"
+					}
+				},
+				"unitsOverrides": [],
+				"coloring": {
+					"colorRules": [
+						{
+							"colorMode": "single-color",
+							"comparator": "=",
+							"field": "DT.name",
+							"type": "string",
+							"value": "Covered",
+							"color": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+						},
+						{
+							"colorMode": "single-color",
+							"comparator": "=",
+							"field": "covered",
+							"value": "Not covered",
+							"type": "string",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"42": {
+			"title": "Host coverage by product",
+			"type": "data",
+			"query": "smartscapeNodes HOST\n| fields id, name, ip\n| expand host.ip=ip\n| join [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  // filter for events fitting the SD requirements\n  | filterOut isNull(event.type) or isNull(object.id)\n  // filter with the dashobard variables\n  | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n  | filterOut isNull(host.ip)\n  | expand host.ip\n  | fieldsAdd host.ip=ip(host.ip)\n  | summarize {\n      Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n      Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"}))\n    }, by:{host.ip, event.provider, product.name}\n], kind:leftOuter, on:{host.ip}, fields:{event.provider, product.name}\n| fieldsAdd Product=if(isNotNull(event.provider) or isNotNull(product.name), product.name, else:\"Not covered\")\n| fieldsAdd Provider=if(isNotNull(event.provider) or isNotNull(product.name), event.provider, else:\"Not covered\")\n| summarize {\n  Entities=countDistinctExact(id)\n}, by:{Provider, Product}\n| sort Entities desc",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"dt.source_entity"
+						]
+					],
+					"linewrapEnabled": true,
+					"lineWrapIds": [
+						[
+							"Product"
+						]
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "Findings",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819432179
+					},
+					{
+						"identifier": "Scans",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819438046
+					}
+				],
+				"coloring": {
+					"thresholdRules": [],
+					"colorRules": [
+						{
+							"colorMode": "single-color",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)",
+							"comparator": "=",
+							"field": "Provider",
+							"value": "Not covered",
+							"type": "string"
+						},
+						{
+							"colorMode": "single-color",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)",
+							"comparator": "=",
+							"field": "Product",
+							"value": "Not covered",
+							"type": "string"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"43": {
+			"title": "Host coverage",
+			"type": "data",
+			"query": "fetch dt.entity.host\n| fieldsAdd entity.name, entity.detected_name, ipAddress\n| expand ipAddress\n| join [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  // filter for events fitting the SD requirements\n  | filterOut isNull(event.type) or isNull(object.id)\n  // filter with the dashobard variables\n  | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n  | filterOut isNull(host.ip)\n  | expand host.ip\n  | summarize {\n      Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n      Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"}))\n    }, by:{host.ip, event.provider}\n], kind:leftOuter, on:{left[ipAddress]==right[host.ip]}\n| fieldsAdd covered=if(isNotNull(right.host.ip), \"Covered\", else:\"Not covered\")\n| summarize {\n  Entities=countDistinctExact(id)\n}, by:{covered}",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"circleChartSettings": {
+						"valueType": "relative",
+						"showTotalValue": true,
+						"groupingThresholdType": "relative"
+					}
+				},
+				"unitsOverrides": [],
+				"coloring": {
+					"colorRules": [
+						{
+							"colorMode": "single-color",
+							"comparator": "=",
+							"field": "DT.name",
+							"type": "string",
+							"value": "Covered",
+							"color": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+						},
+						{
+							"colorMode": "single-color",
+							"comparator": "=",
+							"field": "covered",
+							"value": "Not covered",
+							"type": "string",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"44": {
+			"title": "Container workload coverage by product",
+			"type": "data",
+			"query": "smartscapeNodes {K8S_DEPLOYMENT, K8S_CRONJOB, K8S_DAEMONSET, K8S_JOB, K8S_STATEFULSET, K8S_REPLICASET}\n| fields id, containerNames=name, dt.source_entity=id_classic, workloadName=k8s.workload.name\n| join [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  | filter exists(dt.smartscape_source.id)\n  // filter for events fitting the SD requirements\n  | filterOut isNull(event.type) or isNull(object.id)\n  // dashboard variables\n  | filter (in(event.provider, $Provider))\n   AND (isNull(product.name) OR in(product.name, $Product))\n   AND (in(object.type, $AffectedObjectType))\n   AND (in(event.type,$EventType))\n  | dedup dt.smartscape_source.id, event.provider, product.name\n  | fields dt.smartscape_source.id, event.provider, product.name\n], kind:leftouter, on:{left[id]==right[dt.smartscape_source.id]}, \n   fields:{\n     event.provider, product.name, dt.smartscape_source.id\n   }\n| append [\n  fetch dt.entity.container_group_instance\n  | fields containerImageDigest, containerNames, container_group.id=instance_of[dt.entity.container_group], \n           workload.id=belongs_to[dt.entity.cloud_application], workloadName\n  | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n  | join [\n    fetch security.events\n    | filter dt.system.bucket == \"default_securityevents\"\n    | filter isNotNull(container_image.digest)\n    // filter for events fitting the SD requirements\n    | filterOut isNull(event.type) or isNull(object.id)\n    // dashboard variables\n    | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n    | dedup event.provider, product.name, container_image.digest\n    | fields event.provider, product.name, container_image.digest\n  ], kind:leftOuter, on:{left[containerImageDigest]==right[container_image.digest]}, \n    fields:{\n     event.provider, product.name, container_image.digest\n    }\n]\n| append [\n  fetch dt.entity.container_group_instance\n  | fields containerImageId, containerNames, container_group.id=instance_of[dt.entity.container_group], \n           workload.id=belongs_to[dt.entity.cloud_application], workloadName\n  | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n  | join [\n    fetch security.events\n    | filter dt.system.bucket == \"default_securityevents\"\n    | filter isNotNull(container_image.id)\n    // filter for events fitting the SD requirements\n    | filterOut isNull(event.type) or isNull(object.id)\n    // dashboard variables\n    | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n    | dedup event.provider, product.name, container_image.id\n    | fields event.provider, product.name, container_image.id\n  ], kind:leftOuter, on:{left[containerImageId]==right[container_image.id]}, \n    fields:{\n      event.provider, product.name, container_image.digest=container_image.id\n    }\n]\n| fieldsAdd Product=if(isNotNull(container_image.digest) or isNotNull(dt.smartscape_source.id), product.name, else:\"Not covered\")\n| fieldsAdd Provider=if(isNotNull(container_image.digest) or isNotNull(dt.smartscape_source.id), event.provider, else:\"Not covered\")\n| summarize {\n  Entities=countDistinctExact(dt.source_entity)\n}, by:{Provider, Product}\n| sort Entities desc",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"dt.source_entity"
+						]
+					],
+					"linewrapEnabled": true,
+					"lineWrapIds": [
+						[
+							"Product"
+						]
+					]
+				},
+				"unitsOverrides": [],
+				"coloring": {
+					"thresholdRules": [],
+					"colorRules": [
+						{
+							"colorMode": "single-color",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)",
+							"comparator": "=",
+							"field": "Provider",
+							"value": "Not covered",
+							"type": "string"
+						},
+						{
+							"colorMode": "single-color",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)",
+							"comparator": "=",
+							"field": "Product",
+							"value": "Not covered",
+							"type": "string"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"45": {
+			"title": "Last 10 covered hosts",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n   AND (isNull(product.name) OR in(product.name, $Product))\n   AND (in(object.type, $AffectedObjectType))\n   AND (in(event.type,$EventType))\n| filterOut isNull(host.ip)\n| expand host.ip\n| fieldsAdd host.ip=ip(host.ip)\n| join [\n  smartscapeNodes HOST\n  | fields id, name, ip\n  | expand host.ip=ip\n], kind:leftOuter, on:{host.ip}, fields:{dt.smartscape_source.id=id, name}\n| filter isNotNull(dt.smartscape_source.id) or isNotNull(dt.smartscape_source.id)\n| summarize {\n  `Last event`=takeMax(timestamp),\n  Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n  Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})),\n  Providers=collectDistinct(event.provider)\n}, by:{dt.smartscape_source.id, Name=name}\n| sort `Last event` desc\n| fieldsAdd `Last event`=toDuration(now()-`Last event`)",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"dt.source_entity"
+						],
+						[
+							"dt.smartscape_source.id"
+						]
+					],
+					"linewrapEnabled": true,
+					"lineWrapIds": [
+						[
+							"Products"
+						]
+					],
+					"columnWidths": {
+						"[\"Products\"]": 391.7
+					},
+					"hideColumnsForLargeResults": false,
+					"columnOrder": [
+						"[\"dt.smartscape_source.id\"]",
+						"[\"Last event\"]",
+						"[\"Name\"]",
+						"[\"Findings\"]",
+						"[\"Scans\"]",
+						"[\"Providers\"]"
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "Findings",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819432179
+					},
+					{
+						"identifier": "Scans",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819438046
+					},
+					{
+						"identifier": "Last event",
+						"unitCategory": "time",
+						"baseUnit": "nanosecond",
+						"displayUnit": "hour",
+						"decimals": 0,
+						"suffix": "h ago",
+						"delimiter": false,
+						"added": 1771947943552
+					}
+				],
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"46": {
+			"title": "Last 10 covered container workloads",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n| filter exists(dt.smartscape_source.id)\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// dashboard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n| join [\n  smartscapeNodes {K8S_DEPLOYMENT, K8S_CRONJOB, K8S_DAEMONSET, K8S_JOB, K8S_STATEFULSET, K8S_REPLICASET}, from:now()-2h\n], on:{left[dt.smartscape_source.id]==right[id]}, \n   fields:{\n     containerNames=name, dt.source_entity=id_classic, workloadName=k8s.workload.name\n   }\n| append [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  | filter isNotNull(container_image.digest)\n  // dashboard variables\n | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n  // contextualization\n  | join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd containerNames, container_group.id=instance_of[dt.entity.container_group], workload.id=belongs_to[dt.entity.cloud_application], workloadName\n    | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n  ], kind:leftOuter, on:{right[containerImageDigest]==left[container_image.digest]}, \n    fields:{\n      containerNames, dt.source_entity, workloadName\n    }\n]\n| append [\n    fetch security.events\n    | filter dt.system.bucket == \"default_securityevents\"\n    | filter isNotNull(container_image.digest)\n    // dashboard variables\n    | filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd containerNames, containerImageId, container_group.id=instance_of[dt.entity.container_group], workload.id=belongs_to[dt.entity.cloud_application], workloadName\n        | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n    ], kind:leftOuter, on:{left[container_image.id]==right[containerImageId]},\n       fields:{\n         containerNames, dt.source_entity, workloadName\n       }\n]\n| filterOut isNull(dt.source_entity)\n| dedup {dt.source_entity, workloadName, container_image.digest, event.provider, finding.id, object.id, dt.security.risk.level}, sort:{timestamp desc}\n| summarize {\n  `Last event`=takeMax(timestamp),\n  Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n  Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})),\n  Providers=collectDistinct(event.provider)\n}, by:{dt.source_entity, Workload=workloadName}\n| sort `Last event` desc\n| limit 10\n| fieldsAdd `Last event`=toDuration(now()-`Last event`)",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"dt.source_entity"
+						]
+					],
+					"hideColumnsForLargeResults": false,
+					"linewrapEnabled": true,
+					"lineWrapIds": [
+						[
+							"Products"
+						]
+					],
+					"columnWidths": {
+						"[\"Products\"]": 423
+					},
+					"columnOrder": [
+						"[\"dt.source_entity\"]",
+						"[\"Last event\"]",
+						"[\"Workload\"]",
+						"[\"Findings\"]",
+						"[\"Scans\"]",
+						"[\"Providers\"]"
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "Findings",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819432179
+					},
+					{
+						"identifier": "Scans",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819438046
+					},
+					{
+						"identifier": "Last event",
+						"unitCategory": "time",
+						"baseUnit": "nanosecond",
+						"displayUnit": "hour",
+						"decimals": 0,
+						"suffix": "h ago ",
+						"delimiter": false,
+						"added": 1771947814425
+					}
+				],
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"47": {
+			"type": "markdown",
+			"content": "### Latest 50 security events\nRecently ingested security events.\n"
+		},
+		"48": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n// filter with the dashobard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n// aggregation and custom filtering\n| fieldsAdd object.name=coalesce(object.name, object.id)\n| fields timestamp, Time=timestamp, Provider=event.provider, Product=product.name,\n        `Event type`=event.type, `Object type`=object.type, `Affected object`=object.name\n| sort {timestamp, direction:\"descending\"}\n| fieldsRemove timestamp\n| limit 50",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"lineWrapIds": [
+						[
+							"Repository"
+						]
+					],
+					"sortBy": [
+						{
+							"columnId": "[\"Affected object\"]",
+							"direction": "ascending"
+						}
+					],
+					"columnWidths": {
+						"[\"Object type\"]": 183.63
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"49": {
+			"type": "markdown",
+			"content": "## Runtime entity coverage: Cloud entities\nDynatrace-monitored cloud entities covered by the various ingested findings."
+		},
+		"50": {
+			"title": "Last 10 covered cloud entities",
+			"type": "data",
+			"query": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\n// filter for events fitting the SD requirements\n| filterOut isNull(event.type) or isNull(object.id)\n| filter exists(dt.smartscape_source.id)\n// dashboard variables\n| filter (in(event.provider, $Provider))\n     AND (isNull(product.name) OR in(product.name, $Product))\n     AND (in(object.type, $AffectedObjectType))\n     AND (in(event.type,$EventType))\n| join [\n  smartscapeNodes \"*\", from:now()-24h\n  | filter exists(cloud.provider)\n], on:{left[dt.smartscape_source.id]==right[id]}, \n   fields:{name}\n| summarize {\n  `Last event`=takeMax(timestamp),\n  Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\",\"DETECTION_FINDING\",\"COMPLIANCE_FINDING\"})),\n  Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\",\"COMPLIANCE_SCAN\"})),\n  Providers=collectDistinct(event.provider)\n}, by:{Type=dt.smartscape_source.type, dt.smartscape_source.id, Name=name}\n| sort `Last event` desc\n| limit 10\n| fieldsAdd `Last event`=toDuration(now()-`Last event`)",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"dt.source_entity"
+						],
+						[
+							"dt.smartscape_source.id"
+						]
+					],
+					"linewrapEnabled": true,
+					"lineWrapIds": [
+						[
+							"Products"
+						]
+					],
+					"columnWidths": {
+						"[\"Products\"]": 391.7
+					},
+					"hideColumnsForLargeResults": false,
+					"columnOrder": [
+						"[\"Last event\"]",
+						"[\"Type\"]",
+						"[\"Name\"]",
+						"[\"dt.smartscape_source.id\"]",
+						"[\"Findings\"]",
+						"[\"Scans\"]",
+						"[\"Providers\"]"
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "Findings",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819432179
+					},
+					{
+						"identifier": "Scans",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819438046
+					},
+					{
+						"identifier": "Last event",
+						"unitCategory": "time",
+						"baseUnit": "nanosecond",
+						"displayUnit": "hour",
+						"decimals": 0,
+						"suffix": "h ago",
+						"delimiter": false,
+						"added": 1771947943552
+					}
+				],
+				"coloring": {
+					"thresholdRules": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"51": {
+			"title": "Cloud entity coverage by product",
+			"type": "data",
+			"query": "smartscapeNodes \"*\", from:now()-24h\n| filter exists(cloud.provider)\n| join [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  // filter for events fitting the SD requirements\n  | filterOut isNull(event.type) or isNull(object.id)\n  | filter exists(dt.smartscape_source.id)\n  // dashboard variables\n  | filter (in(event.provider, $Provider))\n       AND (isNull(product.name) OR in(product.name, $Product))\n       AND (in(object.type, $AffectedObjectType))\n       AND (in(event.type,$EventType))\n  | dedup dt.smartscape_source.id, event.provider, product.name\n  | fields dt.smartscape_source.id, event.provider, product.name\n], kind:leftOuter,\n   on:{right[dt.smartscape_source.id]==left[id]}, \n   fields:{dt.smartscape_source.id, event.provider, product.name}\n| fieldsAdd Product=if(isNotNull(dt.smartscape_source.id), product.name, else:\"Not covered\")\n| fieldsAdd Provider=if(isNotNull(dt.smartscape_source.id), event.provider, else:\"Not covered\")\n| summarize {\n  Entities=countDistinctExact(id)\n}, by:{Provider, Product}\n| sort Entities desc",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"dt.source_entity"
+						]
+					],
+					"linewrapEnabled": true,
+					"lineWrapIds": [
+						[
+							"Product"
+						]
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "Findings",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819432179
+					},
+					{
+						"identifier": "Scans",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1732819438046
+					}
+				],
+				"coloring": {
+					"thresholdRules": [],
+					"colorRules": [
+						{
+							"colorMode": "single-color",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)",
+							"comparator": "=",
+							"field": "Provider",
+							"value": "Not covered",
+							"type": "string"
+						},
+						{
+							"colorMode": "single-color",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)",
+							"comparator": "=",
+							"field": "Product",
+							"value": "Not covered",
+							"type": "string"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"52": {
+			"title": "Cloud entity coverage",
+			"type": "data",
+			"query": "smartscapeNodes \"*\", from:now()-24h\n| filter exists(cloud.provider)\n| join [\n  fetch security.events\n  | filter dt.system.bucket == \"default_securityevents\"\n  // filter for events fitting the SD requirements\n  | filterOut isNull(event.type) or isNull(object.id)\n  | filter exists(dt.smartscape_source.id)\n  // dashboard variables\n  | filter (in(event.provider, $Provider))\n       AND (isNull(product.name) OR in(product.name, $Product))\n       AND (in(object.type, $AffectedObjectType))\n       AND (in(event.type,$EventType))\n  | dedup dt.smartscape_source.id, event.provider, product.name\n  | fields dt.smartscape_source.id, event.provider, product.name\n], kind:leftOuter,\n   on:{right[dt.smartscape_source.id]==left[id]}, \n   fields:{dt.smartscape_source.id, event.provider, product.name}\n| fieldsAdd covered=if(isNotNull(dt.smartscape_source.id), \"Covered\", else:\"Not covered\")\n| summarize {\n  Entities=countDistinctExact(id)\n}, by:{covered}",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"circleChartSettings": {
+						"valueType": "relative",
+						"showTotalValue": true,
+						"groupingThresholdType": "relative"
+					}
+				},
+				"unitsOverrides": [],
+				"coloring": {
+					"colorRules": [
+						{
+							"colorMode": "single-color",
+							"comparator": "=",
+							"field": "DT.name",
+							"type": "string",
+							"value": "Covered",
+							"color": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+						},
+						{
+							"colorMode": "single-color",
+							"comparator": "=",
+							"field": "covered",
+							"value": "Not covered",
+							"type": "string",
+							"color": "var(--dt-colors-charts-loglevel-error-default, #cd3741)"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		}
+	},
+	"layouts": {
+		"1": {
+			"x": 0,
+			"y": 0,
+			"w": 24,
+			"h": 2
+		},
+		"19": {
+			"x": 0,
+			"y": 9,
+			"w": 24,
+			"h": 2
+		},
+		"30": {
+			"x": 0,
+			"y": 11,
+			"w": 11,
+			"h": 6
+		},
+		"31": {
+			"x": 7,
+			"y": 2,
+			"w": 17,
+			"h": 4
+		},
+		"32": {
+			"x": 4,
+			"y": 6,
+			"w": 3,
+			"h": 3
+		},
+		"33": {
+			"x": 0,
+			"y": 2,
+			"w": 4,
+			"h": 7
+		},
+		"34": {
+			"x": 7,
+			"y": 6,
+			"w": 17,
+			"h": 3
+		},
+		"35": {
+			"x": 4,
+			"y": 2,
+			"w": 3,
+			"h": 4
+		},
+		"36": {
+			"x": 0,
+			"y": 17,
+			"w": 11,
+			"h": 6
+		},
+		"37": {
+			"x": 11,
+			"y": 17,
+			"w": 13,
+			"h": 6
+		},
+		"38": {
+			"x": 0,
+			"y": 43,
+			"w": 24,
+			"h": 2
+		},
+		"39": {
+			"x": 11,
+			"y": 11,
+			"w": 13,
+			"h": 6
+		},
+		"40": {
+			"x": 0,
+			"y": 23,
+			"w": 24,
+			"h": 2
+		},
+		"41": {
+			"x": 0,
+			"y": 25,
+			"w": 4,
+			"h": 8
+		},
+		"42": {
+			"x": 4,
+			"y": 45,
+			"w": 7,
+			"h": 8
+		},
+		"43": {
+			"x": 0,
+			"y": 45,
+			"w": 4,
+			"h": 8
+		},
+		"44": {
+			"x": 4,
+			"y": 25,
+			"w": 7,
+			"h": 8
+		},
+		"45": {
+			"x": 11,
+			"y": 45,
+			"w": 13,
+			"h": 8
+		},
+		"46": {
+			"x": 11,
+			"y": 25,
+			"w": 13,
+			"h": 8
+		},
+		"47": {
+			"x": 0,
+			"y": 53,
+			"w": 24,
+			"h": 2
+		},
+		"48": {
+			"x": 0,
+			"y": 55,
+			"w": 24,
+			"h": 12
+		},
+		"49": {
+			"x": 0,
+			"y": 33,
+			"w": 24,
+			"h": 2
+		},
+		"50": {
+			"x": 11,
+			"y": 35,
+			"w": 13,
+			"h": 8
+		},
+		"51": {
+			"x": 4,
+			"y": 35,
+			"w": 7,
+			"h": 8
+		},
+		"52": {
+			"x": 0,
+			"y": 35,
+			"w": 4,
+			"h": 8
+		}
+	},
+	"importedWithCode": false,
+	"settings": {
+		"defaultTimeframe": {
+			"value": {
+				"from": "now()-7d",
+				"to": "now()"
+			},
+			"enabled": true
+		}
+	},
+	"annotations": []
+}

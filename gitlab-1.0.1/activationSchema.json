@@ -1,0 +1,284 @@
+{
+  "dynatrace": "1",
+  "description": "gitlab_advanced_security configuration",
+  "schemaId": "python-extension.activation",
+  "displayName": "GitLab Advanced Security Configuration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": [
+    "tenant"
+  ],
+  "multiObject": false,
+  "types": {
+    "features": {
+      "type": "object",
+      "displayName": "Choose product to integrate:",
+      "properties": {
+        "collect_dependency_scanning_alerts": {
+          "displayName": "Collect dependency scanning alerts",
+          "documentation": "Use this option to collect dependency scanning findings from GitLab projects. For more information, see [GitLab dependency scanning](https://docs.gitlab.com/user/application_security/dependency_scanning/).",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "collect_container_scanning_alerts": {
+          "displayName": "Collect container scanning alerts",
+          "documentation": "Use this option to collect container scanning findings from GitLab projects. For more information, see [GitLab container scanning](https://docs.gitlab.com/user/application_security/container_scanning/).",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        "collect_audit_events": {
+          "displayName": "Collect audit events",
+          "documentation": "Use this option to collect GitLab audit events. For more information, see [GitLab audit events](https://docs.gitlab.com/user/compliance/audit_events/).",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace configuration",
+      "properties": {
+        "use_credential_vault": {
+          "displayName": "Use credential vault for Dynatrace authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credential_vault_id": {
+          "displayName": "Select vault credential for Dynatrace authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_credential_vault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "displayName": "Dynatrace API access token",
+          "description": "Token used to ingest GitLab security events into Dynatrace.",
+          "documentation": "For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_credential_vault",
+            "expectedValue": false
+          }
+        },
+        "use_custom_security_ingest_url": {
+          "type": "boolean",
+          "displayName": "Use custom security events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/security.events` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatrace_security_ingest_url": {
+          "displayName": "(Optional) Dynatrace security events endpoint",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest).",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_custom_security_ingest_url",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "gitlab": {
+      "type": "object",
+      "displayName": "GitLab configuration",
+      "properties": {
+        "url": {
+          "type": "text",
+          "displayName": "GitLab URL",
+          "description": "The base URL where the GitLab API is reachable.",
+          "documentation": "Use `https://gitlab.com` for GitLab.com. For self-managed GitLab, provide your server base URL.",
+          "nullable": false,
+          "default": "https://gitlab.com",
+          "constraints": [
+            {
+              "type": "NOT_EMPTY"
+            }
+          ]
+        },
+        "token": {
+          "type": "secret",
+          "displayName": "Personal Access Token (PAT)",
+          "description": "Personal Access Token used to authenticate to GitLab APIs.",
+          "documentation": "For more information, see [Personal access tokens](https://docs.gitlab.com/user/profile/personal_access_tokens/).",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide a GitLab PAT with API access"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "all_groups": {
+          "displayName": "Collect from all groups",
+          "documentation": "If enabled, security findings and scans will be collected from all accessible GitLab groups. If disabled, only the groups listed below are used.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "groups": {
+          "displayName": "Groups",
+          "documentation": "Use a human-readable group value. Supported matching values are group name, group path, or full group path. Example: `platform-team` or `acme/platform-team`.",
+          "type": "list",
+          "items": {
+            "type": "text",
+            "displayName": "Group name or path"
+          },
+          "precondition": {
+            "type": "EQUALS",
+            "property": "all_groups",
+            "expectedValue": false
+          },
+          "metadata": {
+            "addItemButton": "Add group name or path"
+          }
+        },
+        "all_projects": {
+          "displayName": "Collect from all projects",
+          "documentation": "If enabled, security findings and scans will be collected from all projects in the selected group scope. If disabled, only the projects listed below are used.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "projects": {
+          "displayName": "Projects",
+          "documentation": "Use a human-readable project value. Supported matching values are project name, project path, or project path with namespace. Example: `service-api` or `acme/platform/service-api`.",
+          "type": "list",
+          "items": {
+            "type": "text",
+            "displayName": "Project name or path"
+          },
+          "precondition": {
+            "type": "EQUALS",
+            "property": "all_projects",
+            "expectedValue": false
+          },
+          "metadata": {
+            "addItemButton": "Add project name or path"
+          }
+        }
+      }
+    },
+    "advanced_options": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "first_time_fetch_window_days": {
+          "displayName": "Security events initial fetch time window",
+          "description": "How far back to look for security events during the initial run.",
+          "type": "integer",
+          "nullable": false,
+          "default": 7,
+          "metadata": {
+            "suffix": "days"
+          }
+        },
+        "security_findings_frequency_hours": {
+          "displayName": "Security events ingest frequency",
+          "description": "How often GitLab security findings are collected.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "audit_event_frequency_minutes": {
+          "displayName": "Audit logs ingest frequency",
+          "description": "The extension will fetch audit logs using the specified time period.",
+          "type": "integer",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "minutes"
+          }
+        },
+        "debug_logs": {
+          "displayName": "Enable extension debug logs",
+          "description": "Enable detailed debug logging for troubleshooting.",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "pythonRemote": {
+      "type": "object",
+      "displayName": "GitLab Advanced Security",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "gitlab": {
+          "displayName": "GitLab configuration",
+          "type": {
+            "$ref": "#/types/gitlab"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advanced_options": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advanced_options"
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "pythonRemote": {
+      "displayName": "GitLab Advanced Security",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  }
+}

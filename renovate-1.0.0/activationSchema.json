@@ -1,0 +1,332 @@
+{
+  "types": {
+    "features": {
+      "type": "object",
+      "displayName": "Choose product to integrate:",
+      "properties": {
+        "collectRenovateCESecurityEvents": {
+          "displayName": "Collect Renovate security events",
+          "documentation": "When enabled, the extension will collect security events from Renovate (self-hosted) community or enterprise edition job logs and ingest them into Dynatrace.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "displayName": "Renovate configuration",
+      "documentation": "Configure Renovate and Dynatrace ingest. Renovate API uses Bearer token authentication (MEND_RNV_API_SERVER_SECRET).",
+      "properties": {
+        "renovateBaseUrl": {
+          "displayName": "Base URL",
+          "documentation": "Base URL of your Renovate server (i.e. http://localhost:8080). For more information, see [Renovate API doc](https://mend.github.io/renovate-ce-ee/api.html#/).",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide the Base URL"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "renovateApiSecret": {
+          "displayName": "API secret",
+          "documentation": "API secret (Bearer token). Same value as MEND_RNV_API_SERVER_SECRET in your Renovate deployment.",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide your API secret"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "repositories": {
+          "displayName": "",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/repositories"
+          }
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace",
+      "properties": {
+        "useCredentialVault": {
+          "displayName": "Use credential vault for Dynatrace authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for Dynatrace authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "displayName": "Dynatrace API access token",
+          "description": "For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": false
+          }
+        },
+        "useCustomSecurityIngestUrl": {
+          "type": "boolean",
+          "displayName": "Use custom security events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/security.events` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatraceSecurityIngestUrl": {
+          "displayName": "(Optional) Dynatrace security events endpoint",
+          "description": "If not set, the default endpoint is used.",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest).",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCustomSecurityIngestUrl",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "repositories": {
+      "type": "object",
+      "displayName": "",
+      "description": "",
+      "summaryPattern": "",
+      "properties": {
+        "allOrgsAndRepos": {
+          "displayName": "Collect events for all organizations",
+          "documentation": "When enabled, the extension will fetch job logs for all organizations and all repositories known to Renovate. When disabled, add organization filters and optionally repository filters below.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "orgList": {
+          "displayName": "Organizations",
+          "description": "Partial matches are allowed to 'identify' multiple organizations.",
+          "documentation": "Partial matches are allowed to 'identify' multiple organizations. Add organization filters to limit which organizations are scanned.",
+          "type": "list",
+          "nullable": false,
+          "precondition": {
+            "type": "EQUALS",
+            "expectedValue": false,
+            "property": "allOrgsAndRepos"
+          },
+          "items": {
+            "type": "text",
+            "displayName": "Org filter",
+            "metadata": {
+              "placeholder": "my-org"
+            }
+          },
+          "metadata": {
+            "addItemButton": "Add organization filter"
+          }
+        },
+        "allReposInSelectedOrgs": {
+          "displayName": "Collect job info for all repositories in selected organizations",
+          "description": "When enabled, the extension will fetch job logs for all repositories in each selected organization. When disabled, add repository filters below (org/repo format).",
+          "documentation": "When enabled, the extension will fetch job logs for all repositories in each selected organization. When disabled, add repository filters below using org/repo format (e.g. my-org/my-repo).",
+          "type": "boolean",
+          "nullable": false,
+          "default": true,
+          "precondition": {
+            "type": "EQUALS",
+            "expectedValue": false,
+            "property": "allOrgsAndRepos"
+          }
+        },
+        "repoList": {
+          "displayName": "Repositories",
+          "description": "Partial matches or org/repo format (e.g. my-org/my-repo) to identify repositories.",
+          "documentation": "Partial matches or org/repo format (e.g. my-org/my-repo) to identify repositories. Add repository filters to limit which repositories are scanned.",
+          "type": "list",
+          "nullable": false,
+          "precondition": {
+            "type": "EQUALS",
+            "expectedValue": false,
+            "property": "allReposInSelectedOrgs"
+          },
+          "items": {
+            "type": "text",
+            "displayName": "Repo filter",
+            "metadata": {
+              "placeholder": "my-org/my-repo"
+            }
+          },
+          "metadata": {
+            "addItemButton": "Add repository filter"
+          }
+        }
+      }
+    },
+    "advancedOptions": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "securityFindingsFrequencyHours": {
+          "displayName": "Security findings ingest frequency",
+          "description": "How often security findings will be collected and sent to Dynatrace.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "firstTimeFetchWindow": {
+          "displayName": "Initial fetch time window",
+          "description": "How far back to look for events during the initial run.",
+          "type": "float",
+          "nullable": false,
+          "default": 7,
+          "metadata": {
+            "suffix": "days"
+          }
+        },
+        "debugLogs": {
+          "displayName": "Enable extension debug logs",
+          "description": "Enable verbose logging for troubleshooting.",
+          "documentation": "Enable verbose logging for troubleshooting. Use when diagnosing connection or ingestion issues.",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "pythonRemote": {
+      "type": "object",
+      "displayName": "Renovate CE integration",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "connection": {
+          "displayName": "Renovate configuration",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/connection"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advancedOptions": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advancedOptions"
+          }
+        }
+      }
+    },
+    "pythonLocal": {
+      "type": "object",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "connection": {
+          "displayName": "Renovate configuration",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/connection"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advancedOptions": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advancedOptions"
+          }
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "Renovate integration for Dynatrace. Fetches vulnerability findings and scan events from Renovate job logs and ingests them as security events.",
+  "schemaId": "python-extension.activation",
+  "displayName": "Renovate integration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": ["tenant"],
+  "multiObject": false,
+  "properties": {
+    "pythonLocal": {
+      "displayName": "Python Local Extension",
+      "type": {
+        "$ref": "#/types/pythonLocal"
+      }
+    },
+    "pythonRemote": {
+      "displayName": "Python Remote Extension",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  }
+}

@@ -1,0 +1,1114 @@
+{
+	"version": 19,
+	"variables": [
+		{
+			"key": "Product",
+			"visible": true,
+			"type": "query",
+			"version": 1,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type == \"CONTAINER_IMAGE\"\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(event.provider)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 1,
+			"key": "Registry",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type == \"CONTAINER_IMAGE\"\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(container_image.registry)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 1,
+			"key": "Repository",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type == \"CONTAINER_IMAGE\"\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(container_image.repository)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 1,
+			"key": "Tag",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type == \"CONTAINER_IMAGE\"\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(container_image.tags, expand:true)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 1,
+			"key": "RuntimeStatus",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n// dashboard variables\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(containerStatus)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 1,
+			"key": "ProductStage",
+			"type": "query",
+			"visible": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(releasesStage)))\n| fieldsAdd values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		}
+	],
+	"tiles": {
+		"0": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n// unique fields\n| dedup {object.id}, sort: {timestamp desc}\n// variable fields\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| sort {timestamp, direction:\"descending\"}\n// fields to be displayed\n| fields  `Ingest time`=timestamp, `Scanning product`=event.provider, \n          Registry=container_image.registry, Repository=container_image.repository,\n          Tags=container_image.tags, `Container image`=container_image.digest\n| limit 50",
+			"visualization": "table",
+			"visualizationSettings": {
+				"thresholds": [
+					{
+						"id": 1,
+						"field": "Risk level",
+						"title": "",
+						"isEnabled": true,
+						"rules": [
+							{
+								"id": 2,
+								"color": {
+									"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+								},
+								"comparator": "=",
+								"label": "",
+								"value": "CRITICAL"
+							},
+							{
+								"id": 3,
+								"color": {
+									"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+								},
+								"comparator": "=",
+								"label": "",
+								"value": "HIGH"
+							},
+							{
+								"id": 4,
+								"color": {
+									"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+								},
+								"comparator": "=",
+								"label": "",
+								"value": "MEDIUM"
+							}
+						]
+					}
+				],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "relative",
+						"groupingThresholdValue": 0,
+						"valueType": "relative"
+					},
+					"categoryOverrides": {},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "Scanning product,Registry,Repository,Affected object",
+						"valueAxisLabel": "",
+						"categoryAxis": [
+							"Scanning product",
+							"Registry",
+							"Repository",
+							"Affected object"
+						],
+						"valueAxis": [],
+						"tooltipVariant": "single"
+					},
+					"hiddenLegendFields": [],
+					"truncationMode": "middle"
+				},
+				"singleValue": {
+					"showLabel": true,
+					"label": "",
+					"prefixIcon": "",
+					"recordField": "timestamp",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value",
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					}
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [
+						[
+							"Repository"
+						]
+					],
+					"columnWidths": {
+						"[\"event.provider_product\"]": 187.3975830078125,
+						"[\"affected_entity.id\"]": 574.390625,
+						"[\"container_image.registry\"]": 230.46875,
+						"[\"container_image.repository\"]": 269.65625,
+						"[\"container_image.tag\"]": 208.75,
+						"[\"timestamp\"]": 170.96875,
+						"[\"critical\"]": 113.125,
+						"[\"high\"]": 97.78125,
+						"[\"vulnerabilities\"]": 176,
+						"[\"Id\"]": 211.38751220703126,
+						"[\"Repository\"]": 264.375
+					},
+					"columnTypeOverrides": []
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {
+						"value": "Scanning product"
+					},
+					"legend": "auto",
+					"displayedFields": [
+						"Scanning product",
+						"Registry",
+						"Repository",
+						"Affected object"
+					],
+					"colorMode": "color-palette",
+					"colorPalette": "categorical"
+				},
+				"histogram": {
+					"dataMappings": [],
+					"variant": "single",
+					"displayedFields": [
+						"Scanning product",
+						"Registry",
+						"Repository"
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"1": {
+			"type": "markdown",
+			"content": "# Coverage report for container image scan events\n\nSummary of vulnerability scan events from container image scans, reported by various products."
+		},
+		"4": {
+			"title": "Container image coverage by product",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| dedup {event.provider, object.id}, sort: {timestamp desc}\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| summarize {images=countDistinctExact(container_image.digest)}, by: {event.provider}\n| sort images desc",
+			"visualization": "categoricalBarChart",
+			"visualizationSettings": {
+				"thresholds": [],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "number-of-slices",
+						"groupingThresholdValue": 10,
+						"valueType": "relative"
+					},
+					"categoryOverrides": {},
+					"categoricalBarChartSettings": {
+						"categoryAxis": "event.provider",
+						"categoryAxisLabel": "Scanning product",
+						"valueAxis": [
+							"images"
+						],
+						"valueAxisLabel": "Container images",
+						"tooltipVariant": "single",
+						"layout": "horizontal",
+						"groupMode": "stacked",
+						"isCategoryLabelVisible": true
+					},
+					"hiddenLegendFields": [],
+					"truncationMode": "middle"
+				},
+				"singleValue": {
+					"showLabel": true,
+					"label": "container_image.registry",
+					"prefixIcon": "",
+					"recordField": "container_image.registry",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value",
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					}
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [],
+					"columnWidths": {},
+					"columnTypeOverrides": []
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {
+						"value": "images"
+					},
+					"legend": "auto",
+					"displayedFields": [
+						"event.provider"
+					],
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [
+						{
+							"valueAxis": "images",
+							"rangeAxis": ""
+						}
+					],
+					"variant": "single",
+					"displayedFields": [
+						"event.provider"
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"11": {
+			"title": "Registries",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| dedup {object.id}, sort: {timestamp desc}\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| summarize {registries=countDistinctExact(container_image.registry)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"thresholds": [],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "absolute",
+						"groupingThresholdValue": 0,
+						"valueType": "absolute"
+					},
+					"categoryOverrides": {
+						"NOT_AVAILABLE": {
+							"color": {
+								"Default": "var(--dt-colors-charts-logstatus-none-default, #2c2f3f)"
+							},
+							"added": 1713354177614
+						}
+					},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "registries",
+						"valueAxisLabel": "registries",
+						"categoryAxis": [
+							"registries"
+						],
+						"valueAxis": [
+							"registries"
+						],
+						"tooltipVariant": "single"
+					},
+					"hiddenLegendFields": [],
+					"colorPalette": "security-risk-level",
+					"truncationMode": "middle"
+				},
+				"singleValue": {
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					},
+					"showLabel": false,
+					"label": "registries",
+					"prefixIcon": "",
+					"recordField": "registries",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value"
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [],
+					"columnWidths": {},
+					"columnTypeOverrides": []
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {},
+					"displayedFields": [],
+					"legend": {
+						"hidden": false,
+						"position": "auto"
+					},
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [
+						{
+							"valueAxis": "registries",
+							"rangeAxis": ""
+						}
+					],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"12": {
+			"title": "Container repositories",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| dedup {object.id}, sort: {timestamp desc}\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| summarize {artifacts=countDistinctExact(container_image.repository)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"thresholds": [],
+				"chartSettings": {
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "absolute",
+						"groupingThresholdValue": 0,
+						"valueType": "absolute"
+					},
+					"categoryOverrides": {
+						"NOT_AVAILABLE": {
+							"color": {
+								"Default": "var(--dt-colors-charts-logstatus-none-default, #2c2f3f)"
+							},
+							"added": 1713354177614
+						}
+					},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "vulnerability.risk.level",
+						"valueAxisLabel": "registries"
+					},
+					"hiddenLegendFields": [],
+					"colorPalette": "security-risk-level"
+				},
+				"singleValue": {
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					},
+					"showLabel": false,
+					"label": "",
+					"prefixIcon": "",
+					"recordField": "artifacts",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value"
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [],
+					"columnWidths": {}
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {},
+					"displayedFields": [],
+					"legend": {
+						"hidden": false,
+						"position": "auto"
+					},
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [
+						{
+							"valueAxis": "artifacts",
+							"rangeAxis": ""
+						}
+					],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"13": {
+			"title": "Container images",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| dedup {object.id}, sort: {timestamp desc}\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| summarize {artifacts=countDistinctExact(container_image.digest)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"thresholds": [],
+				"chartSettings": {
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "absolute",
+						"groupingThresholdValue": 0,
+						"valueType": "absolute"
+					},
+					"categoryOverrides": {
+						"NOT_AVAILABLE": {
+							"color": {
+								"Default": "var(--dt-colors-charts-logstatus-none-default, #2c2f3f)"
+							},
+							"added": 1713354177614
+						}
+					},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "vulnerability.risk.level",
+						"valueAxisLabel": "registries"
+					},
+					"hiddenLegendFields": [],
+					"colorPalette": "security-risk-level"
+				},
+				"singleValue": {
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					},
+					"showLabel": false,
+					"label": "",
+					"prefixIcon": "",
+					"recordField": "artifacts",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value"
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [],
+					"columnWidths": {}
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {},
+					"displayedFields": [],
+					"legend": {
+						"hidden": false,
+						"position": "auto"
+					},
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [
+						{
+							"valueAxis": "artifacts",
+							"rangeAxis": ""
+						}
+					],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"14": {
+			"title": "Scanning products",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| dedup {object.id}, sort: {timestamp desc}\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| summarize {products=countDistinctExact(event.provider)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"thresholds": [],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "absolute",
+						"groupingThresholdValue": 0,
+						"valueType": "absolute"
+					},
+					"categoryOverrides": {
+						"NOT_AVAILABLE": {
+							"color": {
+								"Default": "var(--dt-colors-charts-logstatus-none-default, #2c2f3f)"
+							},
+							"added": 1713354177614
+						}
+					},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "products",
+						"valueAxisLabel": "products",
+						"categoryAxis": [
+							"products"
+						],
+						"valueAxis": [
+							"products"
+						],
+						"tooltipVariant": "single"
+					},
+					"hiddenLegendFields": [],
+					"colorPalette": "security-risk-level",
+					"truncationMode": "middle"
+				},
+				"singleValue": {
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					},
+					"showLabel": false,
+					"label": "products",
+					"prefixIcon": "",
+					"recordField": "products",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value"
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [],
+					"columnWidths": {},
+					"columnTypeOverrides": []
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {},
+					"displayedFields": [],
+					"legend": {
+						"hidden": false,
+						"position": "auto"
+					},
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [
+						{
+							"valueAxis": "products",
+							"rangeAxis": ""
+						}
+					],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"15": {
+			"type": "markdown",
+			"content": "## Coverage overview\nDistribution of security findings by reporting products and the corresponding affected object types."
+		},
+		"16": {
+			"title": "Scan events over time by product",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// get the latest vulnerability finding report for the affected entity and the component of the repository in the registry\n| makeTimeseries count(), time:{timestamp}, interval: 24h, by:{event.provider}",
+			"visualization": "barChart",
+			"visualizationSettings": {
+				"autoSelectVisualization": false,
+				"thresholds": [],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "relative",
+						"groupingThresholdValue": 0,
+						"valueType": "relative"
+					},
+					"categoryOverrides": {},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "event.provider",
+						"valueAxisLabel": "interval",
+						"categoryAxis": [
+							"event.provider"
+						],
+						"valueAxis": [
+							"interval"
+						],
+						"tooltipVariant": "single"
+					},
+					"hiddenLegendFields": [],
+					"fieldMapping": {
+						"timestamp": "timeframe",
+						"leftAxisValues": [
+							"count()"
+						]
+					},
+					"leftYAxisSettings": {
+						"scale": "linear"
+					},
+					"truncationMode": "middle",
+					"valueRepresentation": "absolute"
+				},
+				"singleValue": {
+					"trend": {
+						"trendType": "auto",
+						"isVisible": true
+					},
+					"showLabel": true,
+					"label": "timestamp",
+					"prefixIcon": "",
+					"recordField": "timestamp",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value"
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [
+						[
+							"Repository"
+						]
+					],
+					"columnWidths": {
+						"[\"event.provider_product\"]": 187.3975830078125,
+						"[\"affected_entity.id\"]": 574.390625,
+						"[\"container_image.registry\"]": 230.46875,
+						"[\"container_image.repository\"]": 269.65625,
+						"[\"container_image.tag\"]": 208.75,
+						"[\"timestamp\"]": 170.96875,
+						"[\"critical\"]": 113.125,
+						"[\"high\"]": 97.78125,
+						"[\"vulnerabilities\"]": 176,
+						"[\"Id\"]": 211.38751220703126,
+						"[\"Repository\"]": 264.375
+					},
+					"columnTypeOverrides": [
+						{
+							"fields": [
+								"count()"
+							],
+							"value": "sparkline",
+							"id": 1753435811258
+						}
+					]
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {
+						"value": "interval"
+					},
+					"legend": "auto",
+					"displayedFields": [
+						"event.provider"
+					],
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"17": {
+			"title": "Total scan events",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize the events\n| summarize {scanEvents=count()}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"thresholds": [],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "absolute",
+						"groupingThresholdValue": 0,
+						"valueType": "absolute"
+					},
+					"categoryOverrides": {
+						"NOT_AVAILABLE": {
+							"color": {
+								"Default": "var(--dt-colors-charts-logstatus-none-default, #2c2f3f)"
+							},
+							"added": 1713354177614
+						}
+					},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "scanEvents",
+						"valueAxisLabel": "scanEvents",
+						"categoryAxis": [
+							"scanEvents"
+						],
+						"valueAxis": [
+							"scanEvents"
+						],
+						"tooltipVariant": "single"
+					},
+					"hiddenLegendFields": [],
+					"colorPalette": "security-risk-level",
+					"truncationMode": "middle"
+				},
+				"singleValue": {
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					},
+					"showLabel": false,
+					"label": "scanEvents",
+					"prefixIcon": "",
+					"recordField": "scanEvents",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value"
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [],
+					"columnWidths": {},
+					"columnTypeOverrides": []
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {
+						"value": "scanEvents"
+					},
+					"displayedFields": [
+						null
+					],
+					"legend": {
+						"hidden": false,
+						"position": "auto"
+					},
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [
+						{
+							"valueAxis": "scanEvents",
+							"rangeAxis": ""
+						}
+					],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"18": {
+			"title": "Repository coverage based on products and number of scans",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_SCAN\"\n  AND object.type==\"CONTAINER_IMAGE\"\n// variable fields\n| filter in(event.provider, $Product)\n     AND in(container_image.registry, $Registry)\n     AND in(container_image.repository, $Repository)\n     AND in(container_image.tags, $Tag)\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n        | fieldsRemove processes\n        | join [\n            fetch dt.entity.process_group_instance, from:now()-3h\n        ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, containerStatus}\n| parse containerStatus, \"\"\"LD* \"state=\" LD:containerStatus (\"}\" | \",\")\"\"\"\n| fieldsAdd containerStatus=if(isNull(containerStatus),\"not running\",else:containerStatus)\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter in(containerStatus, $RuntimeStatus) AND in(releasesStage,$ProductStage)\n// summarize findings\n| summarize {`Scan events`=count(), \n             `Scanning products`=collectDistinct(event.provider)}, \n  by:{\n    Repository=container_image.repository, \n    Tags=container_image.tags}\n| sort `Scan events` desc\n| limit 50",
+			"visualization": "table",
+			"visualizationSettings": {
+				"thresholds": [
+					{
+						"id": 1,
+						"field": "Risk level",
+						"title": "",
+						"isEnabled": true,
+						"rules": [
+							{
+								"id": 2,
+								"color": {
+									"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+								},
+								"comparator": "=",
+								"label": "",
+								"value": "CRITICAL"
+							},
+							{
+								"id": 3,
+								"color": {
+									"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+								},
+								"comparator": "=",
+								"label": "",
+								"value": "HIGH"
+							},
+							{
+								"id": 4,
+								"color": {
+									"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+								},
+								"comparator": "=",
+								"label": "",
+								"value": "MEDIUM"
+							}
+						]
+					}
+				],
+				"chartSettings": {
+					"xAxisScaling": "analyzedTimeframe",
+					"gapPolicy": "connect",
+					"circleChartSettings": {
+						"groupingThresholdType": "relative",
+						"groupingThresholdValue": 0,
+						"valueType": "relative"
+					},
+					"categoryOverrides": {},
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "Repository",
+						"valueAxisLabel": "Scan events",
+						"categoryAxis": "Repository",
+						"valueAxis": [
+							"Scan events"
+						],
+						"tooltipVariant": "single"
+					},
+					"hiddenLegendFields": [],
+					"truncationMode": "middle"
+				},
+				"singleValue": {
+					"showLabel": true,
+					"label": "timestamp",
+					"prefixIcon": "",
+					"recordField": "timestamp",
+					"autoscale": true,
+					"alignment": "center",
+					"colorThresholdTarget": "value",
+					"trend": {
+						"trendType": "auto",
+						"isVisible": false
+					}
+				},
+				"table": {
+					"rowDensity": "condensed",
+					"enableSparklines": false,
+					"hiddenColumns": [],
+					"lineWrapIds": [
+						[
+							"Repository"
+						]
+					],
+					"columnWidths": {
+						"[\"event.provider_product\"]": 187.3975830078125,
+						"[\"affected_entity.id\"]": 574.390625,
+						"[\"container_image.registry\"]": 230.46875,
+						"[\"container_image.repository\"]": 269.65625,
+						"[\"container_image.tag\"]": 208.75,
+						"[\"timestamp\"]": 170.96875,
+						"[\"critical\"]": 113.125,
+						"[\"high\"]": 97.78125,
+						"[\"vulnerabilities\"]": 176,
+						"[\"Id\"]": 211.38751220703126,
+						"[\"Repository\"]": 264.375
+					},
+					"columnTypeOverrides": []
+				},
+				"honeycomb": {
+					"shape": "square",
+					"dataMappings": {
+						"value": "Scan events"
+					},
+					"legend": "auto",
+					"displayedFields": [
+						"Repository"
+					],
+					"colorMode": "color-palette",
+					"colorPalette": "blue"
+				},
+				"histogram": {
+					"dataMappings": [],
+					"variant": "single",
+					"displayedFields": []
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"19": {
+			"type": "markdown",
+			"content": "### Latest 50 security scans\nRecently ingested security scans."
+		}
+	},
+	"layouts": {
+		"0": {
+			"x": 0,
+			"y": 22,
+			"w": 24,
+			"h": 13
+		},
+		"1": {
+			"x": 0,
+			"y": 0,
+			"w": 24,
+			"h": 2
+		},
+		"4": {
+			"x": 3,
+			"y": 8,
+			"w": 10,
+			"h": 12
+		},
+		"11": {
+			"x": 0,
+			"y": 11,
+			"w": 3,
+			"h": 3
+		},
+		"12": {
+			"x": 0,
+			"y": 14,
+			"w": 3,
+			"h": 3
+		},
+		"13": {
+			"x": 0,
+			"y": 17,
+			"w": 3,
+			"h": 3
+		},
+		"14": {
+			"x": 0,
+			"y": 8,
+			"w": 3,
+			"h": 3
+		},
+		"15": {
+			"x": 0,
+			"y": 6,
+			"w": 24,
+			"h": 2
+		},
+		"16": {
+			"x": 3,
+			"y": 2,
+			"w": 21,
+			"h": 4
+		},
+		"17": {
+			"x": 0,
+			"y": 2,
+			"w": 3,
+			"h": 4
+		},
+		"18": {
+			"x": 13,
+			"y": 8,
+			"w": 11,
+			"h": 12
+		},
+		"19": {
+			"x": 0,
+			"y": 20,
+			"w": 24,
+			"h": 2
+		}
+	},
+	"importedWithCode": false,
+	"settings": {
+		"defaultTimeframe": {
+			"value": {
+				"from": "now()-7d",
+				"to": "now()"
+			},
+			"enabled": true
+		}
+	}
+}

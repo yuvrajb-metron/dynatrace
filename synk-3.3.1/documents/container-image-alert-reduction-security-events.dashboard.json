@@ -1,0 +1,1962 @@
+{
+	"version": 21,
+	"variables": [
+		{
+			"version": 2,
+			"key": "Provider",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| summarize rawValues = arrayRemoveNulls(arraySort(collectDistinct(event.provider)))\n| fields values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "RiskLevel",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| filter in(event.provider,$Provider)\n| dedup dt.security.risk.level\n| fieldsAdd orderHelper = if(dt.security.risk.level == \"CRITICAL\", 1, else: \nif(dt.security.risk.level == \"HIGH\", 2, else: \n  if(dt.security.risk.level == \"MEDIUM\", 3, else: \n    if(dt.security.risk.level == \"LOW\", 4, else: \n      if(dt.security.risk.level == \"NONE\", 5, else: \n        if(dt.security.risk.level == \"NOT_AVAILABLE\", 6)\n)))))\n| sort orderHelper asc\n| summarize rawValues = arrayRemoveNulls(collectDistinct(dt.security.risk.level))\n| fields values = if(arraySize(rawValues) > 0, rawValues, else:\"None\")",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "Registry",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| filter in(event.provider,$Provider)\n| dedup container_image.registry\n| fields container_image.registry\n| sort container_image.registry\n| append [data record(container_image.registry=\"All\")]\n| limit 999999",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "Repository",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| filter in(event.provider,$Provider)\n| dedup container_image.repository\n| fields container_image.repository\n| sort container_image.repository\n| append [data record(container_image.repository=\"All\")]\n| limit 999999",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "Tag",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| filter in(event.provider,$Provider)\n| fields container_image.tags\n| expand container_image.tags\n| dedup container_image.tags\n| sort container_image.tags\n| append [data record(container_image.tags=\"All\")]\n| limit 999999",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "Vulnerability",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| filter in(event.provider,$Provider)\n| fields vulnerability.id\n| dedup vulnerability.id\n| sort vulnerability.id\n| append [data record(vulnerability.id=\"All\")]\n| limit 999999",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "Component",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| filter in(event.provider,$Provider)\n| fields component.name\n| dedup component.name\n| sort component.name\n| append [data record(component.name=\"All\")]\n| limit 999999",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		},
+		{
+			"version": 2,
+			"key": "ProductStage",
+			"type": "query",
+			"visible": true,
+			"editable": true,
+			"input": "fetch security.events\n| filter dt.system.bucket == \"default_securityevents\"\nAND event.type==\"VULNERABILITY_FINDING\"\n| filter isNotNull(container_image.digest)\n| filter in(event.provider,$Provider)\n| dedup {container_image.digest, event.provider, finding.id, object.id, dt.security.risk.level}, sort: {timestamp desc}\n// contextualization\n| join [\n  fetch dt.entity.container_group_instance, from:now()-1h\n  | fieldsAdd containerNames, container_group.id=instance_of[dt.entity.container_group], workload.id=belongs_to[dt.entity.cloud_application], workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n  | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n], kind:leftOuter, on:{right[containerImageDigest]==left[container_image.digest]}, \n  fields:{\n    containerNames, dt.source_entity, workloadName, containerStatus, processes\n  }\n| append [\n    fetch security.events\n    | filter dt.system.bucket == \"default_securityevents\"\n    AND event.type==\"VULNERABILITY_FINDING\"\n    | filter isNotNull(container_image.digest)\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd containerNames, containerImageId, container_group.id=instance_of[dt.entity.container_group], workload.id=belongs_to[dt.entity.cloud_application], workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n        | fieldsAdd dt.source_entity=coalesce(workload.id,container_group.id)\n    ], kind:leftOuter, on:{left[container_image.id]==right[containerImageId]},\n       fields:{\n         containerNames, dt.source_entity, workloadName, containerStatus, processes\n       }\n]\n| filterOut isNull(dt.source_entity)\n| dedup {dt.source_entity, containerNames, workloadName, container_image.digest, event.provider, finding.id, object.id, dt.security.risk.level}, sort:{timestamp desc}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| fields releasesStage\n| dedup releasesStage\n| sort releasesStage\n| append [data record(releasesStage=\"All\")]\n| limit 999999",
+			"multiple": true,
+			"defaultValue": [
+				"3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+			]
+		}
+	],
+	"tiles": {
+		"1": {
+			"type": "markdown",
+			"content": "# Runtime contextualization of container findings for alert reduction\nReduce noise from container vulnerability findings using runtime context. Learn more about [Security events ingest](https://dt-url.net/1d63p0v)."
+		},
+		"2": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| summarize {\n    `Risk score`=toDouble(takeMax(dt.security.risk.score)),\n    `Last finding`=takeMax(timestamp),\n    `Container images`=countDistinctExact(container_image.digest)\n    }, \n    by:{Vulnerability=vulnerability.id, `Risk level`=dt.security.risk.level}\n| sort {`Risk score`, direction:\"descending\"}, {`Container images`, direction:\"descending\"}\n| fields `Risk level`, Vulnerability, `Container images`\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						]
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"5": {
+			"title": "Critical risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"CRITICAL\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "criticals",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193663126
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"6": {
+			"title": "High risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"HIGH\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "highs",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193676655
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"10": {
+			"title": "Number of vulnerabilities by risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| summarize {\n    numberOfVulnerabilities = countDistinctExact(vulnerability.id),\n    riskScore=takeMax(dt.security.risk.score)}, by:{dt.security.risk.level}\n| sort riskScore desc",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"colorPalette": "security-risk-level",
+					"circleChartSettings": {
+						"showTotalValue": true,
+						"groupingThresholdType": "number-of-slices",
+						"groupingThresholdValue": 3
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"field": "DT.name",
+							"comparator": "= *value*",
+							"value": "",
+							"type": "string",
+							"colorMode": "color-palette",
+							"colorPalette": "security-risk-level"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"16": {
+			"type": "markdown",
+			"content": "## Affecting running containers\n---"
+		},
+		"19": {
+			"type": "markdown",
+			"content": "## Vulnerabilities in container images\n---"
+		},
+		"20": {
+			"title": "Medium risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"MEDIUM\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-06-default, #a9780f)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "highs",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193676655
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"21": {
+			"title": "Percentage of vulnerabilities by funnel stage",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {object.id, finding.id, container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| fieldsAdd types=if(releasesStage!=\"None\" AND isNotNull(container_instance.id) AND in(releasesStage,$ProductStage),\n                     array(\"All\",\"Running\",\"Running (prod)\"),\n              else:if(isNotNull(container_instance.id) AND contains(containerStatus, \"running\"), \n                     array(\"All\",\"Running\"),\n              else:array(\"All\")))\n| expand type=types\n| summarize Vulnerabilities=countDistinctExact(vulnerability.id), by:{`Funnel stage`=type}",
+			"visualization": "categoricalBarChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"categoricalBarChartSettings": {
+						"categoryAxisLabel": "Funnel stage",
+						"categoryAxis": [
+							"Funnel stage"
+						],
+						"valueAxis": [
+							"Vulnerabilities"
+						],
+						"valueAxisLabel": "Vulnerabilities",
+						"scale": "relative",
+						"layout": "vertical"
+					}
+				},
+				"unitsOverrides": [
+					{
+						"identifier": null,
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 2,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1721226654873
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"25": {
+			"type": "markdown",
+			"content": "##### Vulnerabilities in repositories\n____\n"
+		},
+		"27": {
+			"type": "markdown",
+			"content": "## Affecting production containers\n---"
+		},
+		"28": {
+			"type": "markdown",
+			"content": "## Top 10 vulnerabilities\n"
+		},
+		"30": {
+			"title": "Critical risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n| dedup {object.id, finding.id, container_instance.id}\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"CRITICAL\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "criticals",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193663126
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"31": {
+			"title": "High risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n| dedup {object.id, finding.id, container_instance.id}\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"HIGH\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "highs",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193676655
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"32": {
+			"title": "Medium risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n| dedup {object.id, finding.id, container_instance.id}\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"MEDIUM\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-06-default, #a9780f)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "highs",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193676655
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"34": {
+			"title": "Number of vulnerabilities by risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n| dedup {object.id, finding.id, container_instance.id}\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| summarize {\n    numberOfVulnerabilities = countDistinctExact(vulnerability.id),\n    riskScore=takeMax(dt.security.risk.score)}, by:{dt.security.risk.level}\n| sort riskScore desc",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"colorPalette": "security-risk-level",
+					"circleChartSettings": {
+						"showTotalValue": true,
+						"groupingThresholdType": "number-of-slices",
+						"groupingThresholdValue": 3
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"field": "DT.name",
+							"comparator": "= *value*",
+							"value": "",
+							"type": "string",
+							"colorMode": "color-palette",
+							"colorPalette": "security-risk-level"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"35": {
+			"title": "Critical risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {object.id, finding.id, container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"CRITICAL\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "criticals",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193663126
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"36": {
+			"title": "Medium risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {object.id, finding.id, container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"MEDIUM\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-06-default, #a9780f)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "highs",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193676655
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"37": {
+			"title": "High risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {object.id, finding.id, container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| filter dt.security.risk.level==\"HIGH\"\n| summarize {Vulnerabilities=countDistinctExact(vulnerability.id)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "Vulnerabilities",
+					"recordField": "Vulnerabilities",
+					"prefixIcon": "",
+					"trend": {
+						"isVisible": false,
+						"upward": {
+							"Default": "var(--dt-colors-charts-diverging-red-blue-color-02-default, #ae132d)"
+						},
+						"downward": {
+							"Default": "var(--dt-colors-charts-diverging-red-green-color-10-default, #2a7453)"
+						},
+						"isRelative": false
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 1,
+							"comparator": "≥",
+							"field": "Vulnerabilities",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						}
+					]
+				},
+				"unitsOverrides": [
+					{
+						"identifier": "highs",
+						"unitCategory": "unspecified",
+						"baseUnit": "none",
+						"displayUnit": null,
+						"decimals": 0,
+						"suffix": "",
+						"delimiter": false,
+						"added": 1713193676655
+					}
+				]
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"39": {
+			"type": "markdown",
+			"content": "##### Vulnerabilities in running containers\n____\n"
+		},
+		"40": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n| summarize {\n    `Risk score`=toDouble(takeMax(dt.security.risk.score)),\n    `Last finding`=takeMax(timestamp),\n    `Container images`=countDistinctExact(container_image.digest)\n    }, \n    by:{Vulnerability=vulnerability.id, `Risk level`=dt.security.risk.level}\n| sort {`Risk score`, direction:\"descending\"}, {`Container images`, direction:\"descending\"}\n| fields `Risk level`, Vulnerability, `Container images`\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						]
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"41": {
+			"title": "Number of vulnerabilities by risk",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {object.id, finding.id, container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| summarize {\n    numberOfVulnerabilities = countDistinctExact(vulnerability.id),\n    riskScore=takeMax(dt.security.risk.score)}, by:{dt.security.risk.level}\n| sort riskScore desc",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"truncationMode": "middle",
+					"colorPalette": "security-risk-level",
+					"circleChartSettings": {
+						"showTotalValue": true,
+						"groupingThresholdType": "number-of-slices",
+						"groupingThresholdValue": 3
+					}
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"field": "DT.name",
+							"comparator": "= *value*",
+							"value": "",
+							"type": "string",
+							"colorMode": "color-palette",
+							"colorPalette": "security-risk-level"
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"42": {
+			"type": "markdown",
+			"content": "##### Vulnerabilities in production containers\n____\n"
+		},
+		"43": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n      // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n| summarize {\n    `Risk score`=toDouble(takeMax(dt.security.risk.score)),\n    `Last finding`=takeMax(timestamp),\n    `Container images`=countDistinctExact(container_image.digest)\n    }, \n    by:{Vulnerability=vulnerability.id, `Risk level`=dt.security.risk.level}\n| sort {`Risk score`, direction:\"descending\"}, {`Container images`, direction:\"descending\"}\n| fields `Risk level`, Vulnerability, `Container images`\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						]
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"44": {
+			"type": "markdown",
+			"content": "![](https://dt-cdn.net/images/triangle-funnel-492-2bbd7aab8c.png)"
+		},
+		"45": {
+			"type": "markdown",
+			"content": "![](https://dt-cdn.net/images/triangle-funnel-492-2bbd7aab8c.png)"
+		},
+		"46": {
+			"type": "markdown",
+			"content": " "
+		},
+		"47": {
+			"type": "markdown",
+			"content": " "
+		},
+		"48": {
+			"type": "markdown",
+			"content": " "
+		},
+		"49": {
+			"title": "Container images in registries",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| summarize {images=countDistinctExact(container_image.digest)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "images",
+					"recordField": "images",
+					"prefixIcon": "ContainerIcon",
+					"trend": {
+						"isVisible": false
+					}
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"50": {
+			"title": "Container images in runtime",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n| dedup {object.id, finding.id, container_instance.id}\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| summarize {images=countDistinctExact(container_image.digest)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "images",
+					"recordField": "images",
+					"prefixIcon": "ContainerIcon",
+					"trend": {
+						"isVisible": false
+					}
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"51": {
+			"title": "Container images in production",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {object.id, finding.id, container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| summarize {images=countDistinctExact(container_image.digest)}",
+			"visualization": "singleValue",
+			"visualizationSettings": {
+				"singleValue": {
+					"labelMode": "none",
+					"label": "images",
+					"recordField": "images",
+					"prefixIcon": "ContainerIcon",
+					"trend": {
+						"isVisible": false
+					}
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"52": {
+			"type": "markdown",
+			"content": "## Top 10 container repositories\n"
+		},
+		"53": {
+			"type": "markdown",
+			"content": "##### Repositories with production containers"
+		},
+		"54": {
+			"type": "markdown",
+			"content": "##### Repositories with running containers"
+		},
+		"55": {
+			"type": "markdown",
+			"content": "##### Scanned repositories"
+		},
+		"56": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-1h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n| filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n      // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-1h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName, containerStatus, processes}\n    | filter isNotNull(container_instance.id) AND contains(containerStatus, \"running\")\n]\n| dedup {container_instance.id}\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-1h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage = if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n| summarize {\n        Critical=countIf(dt.security.risk.level==\"CRITICAL\"),\n        High=countIf(dt.security.risk.level==\"HIGH\"),\n        `Container images`=countDistinctExact(container_image.digest)\n}, by:{Repository=container_image.repository}\n| sort {Critical, direction:\"descending\"}, {High, direction:\"descending\"},\n       {`Container images`, direction:\"descending\"}\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						]
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"57": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus}\n]\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n| summarize {\n        Critical=countIf(dt.security.risk.level==\"CRITICAL\"),\n        High=countIf(dt.security.risk.level==\"HIGH\"),\n        `Container images`=countDistinctExact(container_image.digest)\n}, by:{Repository=container_image.repository}\n| sort {Critical, direction:\"descending\"}, {High, direction:\"descending\"},\n       {`Container images`, direction:\"descending\"}\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						]
+					],
+					"sortBy": [
+						{
+							"columnId": "[\"Repository\"]",
+							"direction": "descending"
+						}
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"58": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// aggregation and custom filtering\n| summarize {\n        Critical=countIf(dt.security.risk.level==\"CRITICAL\"),\n        High=countIf(dt.security.risk.level==\"HIGH\"),\n        `Container images`=countDistinctExact(container_image.digest)\n}, by:{Repository=container_image.repository}\n| sort {Critical, direction:\"descending\"}, {High, direction:\"descending\"},\n       {`Container images`, direction:\"descending\"}\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						]
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"59": {
+			"type": "markdown",
+			"content": "## Top 10 affected K8s workloads\n"
+		},
+		"60": {
+			"type": "markdown",
+			"content": "##### Production affected K8s workloads"
+		},
+		"61": {
+			"type": "markdown",
+			"content": "##### Affected monitored K8s workloads"
+		},
+		"62": {
+			"type": "markdown",
+			"content": "##### K8s workload stages covered by a container image scan"
+		},
+		"63": {
+			"title": "",
+			"type": "data",
+			"query": "fetch dt.entity.container_group_instance\n| fieldsAdd entity.name, container_instance.status=containerStatus, containerImageDigest, containerImageName, workloadName, workload.id=belongs_to[dt.entity.cloud_application], containerStatus, processes=contains[dt.entity.process_group_instance]\n// filter for those that have running instances in production\n| filter contains(container_instance.status, \"running\")\n| join [\n  fetch security.events\n  | filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n  | dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n  // dashboard filters\n  | filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n  | filterOut isNull(container_image.digest)\n  | summarize {\n      Findings=countIf(in(event.type,{\"VULNERABILITY_FINDING\"})),\n      Scans=countIf(in(event.type,{\"VULNERABILITY_SCAN\"}))\n    }, by:{container_image.digest, event.provider}\n], kind:leftOuter, on:{left[containerImageDigest]==right[container_image.digest]}\n| fieldsAdd covered=if(isNotNull(right.container_image.digest), \"Covered\", else:\"Not covered\")\n| filterOut covered==\"Not covered\"\n| expand dt.entity.process=processes\n| fieldsRemove processes\n| join [\n    fetch dt.entity.process_group_instance, from:now()-3h\n], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"Other\", else:releasesStage)\n//| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n| summarize {\n  Containers=countDistinctExact(workload.id)\n}, by:{releasesStage}",
+			"visualization": "donutChart",
+			"visualizationSettings": {
+				"chartSettings": {
+					"circleChartSettings": {
+						"valueType": "relative",
+						"showTotalValue": true
+					}
+				},
+				"autoSelectVisualization": false
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 1,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"64": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, containerImageDigest, containerImageName, workload.id=belongs_to[dt.entity.cloud_application], workload.name=workloadName\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, \n           container_image.name=containerImageName, container_instance.status=containerStatus,\n           workload.id, workload.name}\n| append [\n    fetch security.events\n    | filter event.type == \"VULNERABILITY_FINDING\"\n         AND object.type == \"CONTAINER_IMAGE\"\n         AND isNotNull(component.name)\n    | dedup {object.id, vulnerability.id, component.name, component.version,\n             container_image.registry, container_image.repository}, sort: {timestamp desc}\n    // dashboard filters\n    | filter in(event.provider, $Provider)\n         AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n         AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n         AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n         AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n         AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n         AND (in(\"All\",$Component) OR in(component.name, $Component))\n    // now enrich the runtime context\n    | join [\n        fetch dt.entity.container_group_instance, from:now()-3h\n        | fieldsAdd entity.name, containerImageId, containerImageName, workload.id=belongs_to[dt.entity.cloud_application], workload.name=workloadName\n    ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n       fields:{container_instance.id=id, container_instance.name=entity.name, \n               container_image.name=containerImageName, container_instance.status=containerStatus,\n               workload.id, workload.name}\n]\n// filter for those that have running instances\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n// aggregation and custom filtering\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n| summarize {\n        Critical=countIf(dt.security.risk.level==\"CRITICAL\"),\n        High=countIf(dt.security.risk.level==\"HIGH\"),\n        `Container images`=countDistinctExact(container_image.digest)\n}, by:{Workload=workload.name, dt.source_entity=workload.id}\n| sort {Critical, direction:\"descending\"}, {High, direction:\"descending\"},\n       {`Container images`, direction:\"descending\"}\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						],
+						[
+							"dt.source_entity"
+						]
+					],
+					"hideColumnsForLargeResults": false,
+					"sortBy": [
+						{
+							"columnId": "[\"Repository\"]",
+							"direction": "descending"
+						}
+					]
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		},
+		"65": {
+			"title": "",
+			"type": "data",
+			"query": "fetch security.events\n| filter event.type == \"VULNERABILITY_FINDING\"\n     AND object.type == \"CONTAINER_IMAGE\"\n     AND isNotNull(component.name)\n| dedup {object.id, vulnerability.id, component.name, component.version,\n         container_image.registry, container_image.repository}, sort: {timestamp desc}\n// dashboard filters\n| filter in(event.provider, $Provider)\n     AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n     AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n     AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n     AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n     AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n     AND (in(\"All\",$Component) OR in(component.name, $Component))\n// now enrich the runtime context\n| join [\n    fetch dt.entity.container_group_instance, from:now()-3h\n    | fieldsAdd entity.name, workload.id=belongs_to[dt.entity.cloud_application], workload.name=workloadName, containerImageDigest, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n    | expand dt.entity.process=processes\n    | fieldsRemove processes\n    | join [\n        fetch dt.entity.process_group_instance, from:now()-3h\n    ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n], on:{left[container_image.digest]==right[containerImageDigest]}, kind:leftOuter,\n   fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n           releasesProduct, releasesStage, container_instance.status=containerStatus,\n           workload.id, workload.name}\n| append [\n  fetch security.events\n  | filter event.type == \"VULNERABILITY_FINDING\"\n       AND object.type == \"CONTAINER_IMAGE\"\n       AND isNotNull(component.name)\n  | dedup {object.id, vulnerability.id, component.name, component.version,\n           container_image.registry, container_image.repository}, sort: {timestamp desc}\n  // dashboard filters\n  | filter in(event.provider, $Provider)\n       AND (in(\"All\",$Registry) OR in(container_image.registry, $Registry))\n       AND (in(\"All\",$Repository) OR in(container_image.repository, $Repository))\n       AND (in(\"All\",$Tag) OR in(container_image.tags, $Tag))\n       AND (in(\"All\",$RiskLevel) OR in(dt.security.risk.level, $RiskLevel))\n       AND (in(\"All\",$Vulnerability) OR in(vulnerability.id, $Vulnerability))\n       AND (in(\"All\",$Component) OR in(component.name, $Component))\n  // now enrich the runtime context\n  | join [\n      fetch dt.entity.container_group_instance, from:now()-3h\n      | fieldsAdd entity.name, workload.id=belongs_to[dt.entity.cloud_application], workload.name=workloadName, \n                containerImageId, containerImageName, workloadName, containerStatus, processes=contains[dt.entity.process_group_instance]\n      | expand dt.entity.process=processes\n      | fieldsRemove processes\n      | join [\n          fetch dt.entity.process_group_instance, from:now()-3h\n      ], on:{left[dt.entity.process]==right[id]}, kind:leftOuter, fields:{releasesProduct, releasesStage}\n  ], on:{left[container_image.id]==right[containerImageId]}, kind:leftOuter,\n     fields:{container_instance.id=id, container_instance.name=entity.name, container_image.name=containerImageName,\n             releasesProduct, releasesStage, container_instance.status=containerStatus,\n             workload.id, workload.name}\n]\n// filter for those that have running instances in production\n| filter isNotNull(container_instance.id) AND contains(container_instance.status, \"running\")\n| fieldsAdd releasesStage=if(isNull(releasesStage), \"None\", else:releasesStage)\n| filter releasesStage!=\"None\" AND in(releasesStage,$ProductStage)\n// aggregation and custom filtering\n| dedup {object.id, vulnerability.id, component.name,\n         container_image.registry, container_image.repository, container_image.tags}, sort: {timestamp desc}\n| summarize {\n        Critical=countIf(dt.security.risk.level==\"CRITICAL\"),\n        High=countIf(dt.security.risk.level==\"HIGH\"),\n        `Container images`=countDistinctExact(container_image.digest)\n}, by:{Workload=workload.name, dt.source_entity=workload.id}\n| sort {Critical, direction:\"descending\"}, {High, direction:\"descending\"},\n       {`Container images`, direction:\"descending\"}\n| limit 10",
+			"visualization": "table",
+			"visualizationSettings": {
+				"table": {
+					"hiddenColumns": [
+						[
+							"riskScore"
+						],
+						[
+							"dt.source_entity"
+						]
+					],
+					"hideColumnsForLargeResults": false
+				},
+				"coloring": {
+					"colorRules": [
+						{
+							"value": 7,
+							"comparator": ">",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+							}
+						},
+						{
+							"value": 9,
+							"comparator": "=",
+							"field": "Risk score",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "CRITICAL",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-loglevel-emergency-default, #9033a3)"
+							}
+						},
+						{
+							"value": "HIGH",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-12-default, #cd3741)"
+							}
+						},
+						{
+							"value": "MEDIUM",
+							"comparator": "=",
+							"field": "Risk level",
+							"colorMode": "custom-color",
+							"customColor": {
+								"Default": "var(--dt-colors-charts-categorical-color-14-default, #d56b1a)"
+							}
+						}
+					]
+				}
+			},
+			"querySettings": {
+				"maxResultRecords": 1000,
+				"defaultScanLimitGbytes": 500,
+				"maxResultMegaBytes": 100,
+				"defaultSamplingRatio": 10,
+				"enableSampling": false
+			},
+			"davis": {
+				"enabled": false,
+				"davisVisualization": {
+					"isAvailable": true
+				}
+			}
+		}
+	},
+	"layouts": {
+		"1": {
+			"x": 0,
+			"y": 0,
+			"w": 24,
+			"h": 2
+		},
+		"2": {
+			"x": 0,
+			"y": 21,
+			"w": 8,
+			"h": 6
+		},
+		"5": {
+			"x": 0,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"6": {
+			"x": 2,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"10": {
+			"x": 0,
+			"y": 12,
+			"w": 6,
+			"h": 7
+		},
+		"16": {
+			"x": 8,
+			"y": 6,
+			"w": 8,
+			"h": 2
+		},
+		"19": {
+			"x": 0,
+			"y": 6,
+			"w": 8,
+			"h": 2
+		},
+		"20": {
+			"x": 4,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"21": {
+			"x": 0,
+			"y": 2,
+			"w": 24,
+			"h": 4
+		},
+		"25": {
+			"x": 0,
+			"y": 20,
+			"w": 8,
+			"h": 1
+		},
+		"27": {
+			"x": 16,
+			"y": 6,
+			"w": 8,
+			"h": 2
+		},
+		"28": {
+			"x": 0,
+			"y": 19,
+			"w": 24,
+			"h": 1
+		},
+		"30": {
+			"x": 8,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"31": {
+			"x": 10,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"32": {
+			"x": 12,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"34": {
+			"x": 8,
+			"y": 12,
+			"w": 6,
+			"h": 7
+		},
+		"35": {
+			"x": 16,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"36": {
+			"x": 20,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"37": {
+			"x": 18,
+			"y": 10,
+			"w": 2,
+			"h": 2
+		},
+		"39": {
+			"x": 8,
+			"y": 20,
+			"w": 8,
+			"h": 1
+		},
+		"40": {
+			"x": 8,
+			"y": 21,
+			"w": 8,
+			"h": 6
+		},
+		"41": {
+			"x": 16,
+			"y": 12,
+			"w": 6,
+			"h": 7
+		},
+		"42": {
+			"x": 16,
+			"y": 20,
+			"w": 8,
+			"h": 1
+		},
+		"43": {
+			"x": 16,
+			"y": 21,
+			"w": 8,
+			"h": 6
+		},
+		"44": {
+			"x": 6,
+			"y": 10,
+			"w": 2,
+			"h": 9
+		},
+		"45": {
+			"x": 14,
+			"y": 10,
+			"w": 2,
+			"h": 9
+		},
+		"46": {
+			"x": 6,
+			"y": 8,
+			"w": 2,
+			"h": 2
+		},
+		"47": {
+			"x": 14,
+			"y": 8,
+			"w": 2,
+			"h": 2
+		},
+		"48": {
+			"x": 22,
+			"y": 8,
+			"w": 2,
+			"h": 11
+		},
+		"49": {
+			"x": 0,
+			"y": 8,
+			"w": 6,
+			"h": 2
+		},
+		"50": {
+			"x": 8,
+			"y": 8,
+			"w": 6,
+			"h": 2
+		},
+		"51": {
+			"x": 16,
+			"y": 8,
+			"w": 6,
+			"h": 2
+		},
+		"52": {
+			"x": 0,
+			"y": 27,
+			"w": 24,
+			"h": 1
+		},
+		"53": {
+			"x": 16,
+			"y": 28,
+			"w": 8,
+			"h": 1
+		},
+		"54": {
+			"x": 8,
+			"y": 28,
+			"w": 8,
+			"h": 1
+		},
+		"55": {
+			"x": 0,
+			"y": 28,
+			"w": 8,
+			"h": 1
+		},
+		"56": {
+			"x": 16,
+			"y": 29,
+			"w": 8,
+			"h": 6
+		},
+		"57": {
+			"x": 8,
+			"y": 29,
+			"w": 8,
+			"h": 6
+		},
+		"58": {
+			"x": 0,
+			"y": 29,
+			"w": 8,
+			"h": 6
+		},
+		"59": {
+			"x": 0,
+			"y": 35,
+			"w": 24,
+			"h": 1
+		},
+		"60": {
+			"x": 16,
+			"y": 36,
+			"w": 8,
+			"h": 1
+		},
+		"61": {
+			"x": 8,
+			"y": 36,
+			"w": 8,
+			"h": 1
+		},
+		"62": {
+			"x": 0,
+			"y": 36,
+			"w": 8,
+			"h": 1
+		},
+		"63": {
+			"x": 0,
+			"y": 37,
+			"w": 8,
+			"h": 6
+		},
+		"64": {
+			"x": 8,
+			"y": 37,
+			"w": 8,
+			"h": 6
+		},
+		"65": {
+			"x": 16,
+			"y": 37,
+			"w": 8,
+			"h": 6
+		}
+	},
+	"importedWithCode": false,
+	"settings": {
+		"defaultTimeframe": {
+			"value": {
+				"from": "now()-7d",
+				"to": "now()"
+			},
+			"enabled": true
+		}
+	},
+	"annotations": []
+}

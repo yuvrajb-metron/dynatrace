@@ -1,0 +1,32 @@
+name: com.dynatrace.extension.gitlab
+version: 1.0.1
+minDynatraceVersion: 1.331.0
+author:
+  name: "Dynatrace"
+
+
+keywords:
+  - title:GitLab
+  - category:security
+  - tech:security
+  - vendor:GitLab
+  - icon:extensions
+  - entity:None
+  
+documents:
+  dashboards:
+    - displayName: Security product coverage
+      path: documents/security_product_coverage.dashboard.json
+    - displayName: Vulnerability findings
+      path: documents/vulnerability_findings.dashboard.json
+
+python:
+  runtime:
+    module: appsec_gitlab
+    version:
+      min: "3.10"
+
+  activation:
+    remote:
+      path: activationSchema.json
+

@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: appsec-snyk
+Version: 3.3.1
+Summary: Appsec_snyk python EF2 extension
+Author: Dynatrace
+Requires-Python: >=3.10
+Requires-Dist: dt-extensions-sdk
+Requires-Dist: requests
+Requires-Dist: pysnyk
+Provides-Extra: dev
+Requires-Dist: dt-extensions-sdk[cli]; extra == "dev"
+

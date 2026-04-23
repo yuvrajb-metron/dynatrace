@@ -1,0 +1,293 @@
+{
+  "types": {
+    "proxy": {
+      "type": "object",
+      "displayName": "Proxy",
+      "summaryPattern": "Proxy {address}",
+      "properties": {
+        "address": {
+          "type": "text",
+          "displayName": "Address",
+          "description": "Proxy address, examples: \n\n* http://proxy.example.com:8080\n* https://proxy.example.com:9091",
+          "nullable": false,
+          "default": "",
+          "constraints": [
+            {
+              "type": "NOT_EMPTY"
+            }
+          ]
+        },
+        "username": {
+          "type": "text",
+          "displayName": "Proxy username",
+          "description": "Proxy username",
+          "nullable": true
+        },
+        "password": {
+          "type": "secret",
+          "displayName": "Proxy password",
+          "description": "Proxy password",
+          "nullable": true
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "displayName": "Project",
+      "summaryPattern": "{name}",
+      "properties": {
+        "name": {
+          "type": "text",
+          "displayName": "Project name",
+          "nullable": false,
+          "default": ""
+        },
+        "repositories": {
+          "type": "list",
+          "displayName": "Repositories",
+          "description": "If no repositories are configured, all repositories in this project will be analyzed",
+          "items": {
+            "type": "text",
+            "displayName": "Repository name"
+          }
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace",
+      "properties": {
+        "dt_token": {
+          "displayName": "Dynatrace access token",
+          "description": "Should have the `openpipeline.events_security` scope. For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token)",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "dynatrace_security_ingest_url": {
+          "displayName": "(Optional) Dynatrace security events endpoint",
+          "description": "Will attempt to use default endpoint if not set",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/events.security`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest)",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ]
+        }
+      }
+    },
+    "harbor": {
+      "type": "object",
+      "displayName": "Harbor",
+      "properties": {
+        "host": {
+          "type": "text",
+          "displayName": "Host",
+          "description": "E.g.: `https://<yourHarborHostnameOrIP>/`",
+          "documentation": "This is the hostname and protocol at which the [Harbor API](https://goharbor.io/docs/main/working-with-projects/using-api-explorer/) will be reachable by your ActiveGates. You do not need to include the path.",
+          "nullable": false,
+          "default": "https://"
+        },
+        "useCredentialVault": {
+          "displayName": "Use credential vault",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credentials",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "USERNAME_PASSWORD",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "username": {
+          "displayName": "Username",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "NOT",
+                "precondition": {
+                  "type": "EQUALS",
+                  "property": "useCredentialVault",
+                  "expectedValue": true
+                }
+              }
+            ]
+          },
+          "maxItems": 1
+        },
+        "password": {
+          "displayName": "Password",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 5000
+            }
+          ],
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "EQUALS",
+                "property": "useCredentialVault",
+                "expectedValue": false
+              }
+            ]
+          },
+          "maxItems": 1
+        },
+        "projects": {
+          "type": "list",
+          "displayName": "Projects",
+          "nullable": true,
+          "description": "If no projects are configured, all projects will be analyzed",
+          "items": {
+            "type": {
+              "$ref": "#/types/project"
+            }
+          }
+        }
+      }
+    },
+    "advanced_options": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "first_time_fetch_window": {
+          "displayName": "First export time window",
+          "description": "The amount of time to look back for the first export. Note that the first export runs every time the extension is restarted.",
+          "type": "float",
+          "nullable": false,
+          "default": 12,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "vulns_fetch_frequency": {
+          "displayName": "Vulnerability management ingest frequency",
+          "description": "The integration will fetch vulnerability findings and scan events periodically using the specified time period.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "audit_fetch_frequency": {
+          "displayName": "Audit log ingest frequency",
+          "description": "The integration will fetch Harbor audit logs periodically using the specified time period.",
+          "type": "integer",
+          "nullable": false,
+          "default": 60,
+          "metadata": {
+            "suffix": "minutes"
+          }
+        },
+        "disable_cert_validation": {
+          "displayName": "Disable certificate validation",
+          "type": "boolean",
+          "nullable": true
+        },
+        "debug_logs": {
+          "displayName": "Enable extension debug logs",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "pythonRemote": {
+      "type": "object",
+      "displayName": "Harbor Monitoring",
+      "properties": {
+        "harbor": {
+          "displayName": "Harbor",
+          "type": {
+            "$ref": "#/types/harbor"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "proxy": {
+          "displayName": "Proxy",
+          "documentation": "Proxy to use for the connection to Harbor",
+          "nullable": true,
+          "type": {
+            "$ref": "#/types/proxy"
+          },
+          "metaData": {
+            "addItemButton": "Define proxy"
+          }
+        },
+        "advanced_options": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advanced_options"
+          }
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "harbor_extension configuration",
+  "schemaId": "python-extension.activation",
+  "displayName": "harbor_extension configuration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": [
+    "tenant"
+  ],
+  "multiObject": false,
+  "properties": {
+    "pythonRemote": {
+      "displayName": "Harbor",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  }
+}

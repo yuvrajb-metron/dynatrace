@@ -1,0 +1,39 @@
+name: com.dynatrace.extension.snyk
+version: 3.3.1
+# name: custom:snyk
+# version: 3.1.0
+minDynatraceVersion: 1.318.0
+minEECVersion: 1.313.0
+author:
+  name: "Dynatrace"
+
+keywords:
+  - title:snyk
+  - category:security
+  - tech:security
+  - vendor:snyk
+  - icon:extensions
+  - entity:None
+
+documents:
+  dashboards:
+    - displayName: Runtime contextualization of container findings for alert reduction
+      path: documents/container-image-alert-reduction-security-events.dashboard.json
+    - displayName: Security product coverage
+      path: documents/security-product-coverage-security-events.dashboard.json
+    - displayName: Container images scan coverage
+      path: documents/container-scan-events-coverage-security-events.dashboard.json
+    - displayName: Vulnerability findings
+      path: documents/vulnerability-findings-security-events.dashboard.json
+    - displayName: Container vulnerability findings
+      path: documents/container-vulnerability-findings-overview-security-events.dashboard.json
+
+python:
+  runtime:
+    module: appsec_snyk
+    version:
+      min: "3.10"
+
+  activation:
+    remote:
+      path: activationSchema.json
