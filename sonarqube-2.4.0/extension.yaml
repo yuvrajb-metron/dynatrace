@@ -1,0 +1,167 @@
+name: com.dynatrace.extension.sonarqube
+version: 2.4.0
+# name: custom:sonarqube
+# version: 99.0.17
+minDynatraceVersion: 1.318.0
+minEECVersion: 1.313.0
+author:
+  name: "Dynatrace"
+
+keywords:
+  - title:sonarqube
+  - category:security
+  - tech:security
+  - vendor:sonarsource
+  - icon:extensions
+  - entity:None
+
+documents:
+  dashboards:
+    - displayName: Vulnerability findings
+      path: documents/vulnerability-findings-security-events.dashboard.json
+    - displayName: Security product coverage
+      path: documents/security-product-coverage-security-events.dashboard.json
+    - displayName: SonarQube posture overview
+      path: documents/sonarqube-posture-overview.dashboard.json
+
+python:
+  runtime:
+    module: sonarqube
+    version:
+      min: "3.10"
+
+  activation:
+    remote:
+      path: activationSchema.json
+
+metrics:
+  - key: sonarqube.code.bugs
+    metadata:
+      displayName: Bugs
+      description: Bugs reported by Sonarqube. Corresponds to the bugs measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.code.lines
+    metadata:
+      displayName: Lines of code
+      description: Lines of code reported by Sonarqube. Corresponds to the ncloc measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.code.coverage
+    metadata:
+      displayName: Code coverage
+      description: Test coverage reported by Sonarqube. Corresponds to the coverage measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.code.duplication
+    metadata:
+      displayName: Duplicated lines density
+      description: Duplicated lines density reported by Sonarqube. Corresponds to the duplicated_lines_density measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.code.smells
+    metadata:
+      displayName: Code smells
+      description: Code smells reported by Sonarqube. Corresponds to the code_smells measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.code.vulnerabilities
+    metadata:
+      displayName: Vulnerabilities
+      description: Vulnerabilities reported by Sonarqube. Corresponds to the vulnerabilities measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.security.hotspots
+    metadata:
+      displayName: Security hotspots
+      description: Security hotspots reported by Sonarqube. Corresponds to the security_hotspots measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.security.hotspots.reviewed
+    metadata:
+      displayName: Reviewed security hotspots
+      description: Reviewed security hotspots reported by Sonarqube. Corresponds to the security_hotspots_reviewed measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.software.quality.maintainability.rating
+    metadata:
+      displayName: Sofware quality maintainability rating
+      description: Sofware quality maintainability rating score reported by Sonarqube. Corresponds to the software_quality_maintainability_rating measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.maintainability.rating
+    metadata:
+      displayName: Maintainability rating
+      description: Maintainability rating reported by Sonarqube. Corresponds to the sqale_rating measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.reliability.rating
+    metadata:
+      displayName: Reliability rating
+      description: Reliability rating reported by Sonarqube. Corresponds to the reliability_rating measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.security.rating
+    metadata:
+      displayName: Security rating
+      description: Security rating reported by Sonarqube. Corresponds to the security_rating measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant
+  - key: sonarqube.security.review.rating
+    metadata:
+      displayName: Security review rating
+      description: Security review rating reported by Sonarqube. Corresponds to the security_review_rating measure.
+      unit: Count
+      dimensions:
+        - key: project
+          displayName: Project
+        - key: tenant
+          displayName: Tenant

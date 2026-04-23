@@ -1,0 +1,535 @@
+{
+  "types": {
+    "features": {
+      "type": "object",
+      "displayName": "Choose product to integrate:",
+      "properties": {
+        "collect_dependabot_alerts": {
+          "displayName": "Collect Dependabot alerts",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "collect_code_scanning_alerts": {
+          "displayName": "Collect code scanning alerts",
+          "type": "boolean",
+          "nullable": true
+        },
+        "collect_secret_alerts": {
+          "displayName": "Collect exposed secrets alerts",
+          "type": "boolean",
+          "nullable": true
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "displayName": "Proxy",
+      "summaryPattern": "Proxy {address}",
+      "properties": {
+        "address": {
+          "type": "text",
+          "displayName": "Proxy address",
+          "description": "Proxy address, examples: \n\n* http://proxy.example.com:8080\n* https://proxy.example.com:9091",
+          "nullable": false,
+          "default": "",
+          "constraints": [
+            {
+              "type": "NOT_EMPTY"
+            }
+          ]
+        },
+        "username": {
+          "type": "text",
+          "displayName": "Proxy username",
+          "nullable": true
+        },
+        "password": {
+          "type": "secret",
+          "displayName": "Proxy password",
+          "nullable": true
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace",
+      "properties": {
+        "useCredentialVault": {
+          "displayName": "Use credential vault for Dynatrace authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for Dynatrace authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "displayName": "Dynatrace API access token",
+          "description": "For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": false
+          }
+        },
+        "use_custom_security_ingest_url": {
+          "type": "boolean",
+          "displayName": "Use custom security events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/security.events` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatrace_security_ingest_url": {
+          "displayName": "(Optional) Dynatrace security events endpoint",
+          "description": "If not set, the default endpoint is used.",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest)",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_custom_security_ingest_url",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "private_key": {
+      "type": "object",
+      "displayName": "App private key",
+      "documentation": "The private key used for GitHub App authentication. For details, see [Generating private keys](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps#generating-private-keys).",
+      "properties": {
+        "method": {
+          "displayName": "Method of providing the key",
+          "type": {
+            "$ref": "#/enums/key_method"
+          },
+          "default": "PATH"
+        },
+        "path": {
+          "displayName": "Path to key file",
+          "documentation": "The file must be accessible to the extension user (default: `dtuserag`) on all ActiveGate in the configured group.",
+          "type": "text",
+          "default": "",
+          "nullable": false,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "method",
+            "expectedValue": "PATH"
+          }
+        },
+        "contents": {
+          "displayName": "Key file contents",
+          "documentation": "Enter (copy-past) the content of the key file without making any changes.",
+          "type": "secret",
+          "default": "",
+          "nullable": false,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 5000
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "method",
+            "expectedValue": "CONTENTS"
+          }
+        }
+      }
+    },
+    "github": {
+      "type": "object",
+      "displayName": "GitHub configuration",
+      "properties": {
+        "url": {
+          "type": "text",
+          "displayName": "GitHub URL",
+          "description": "The base URL where the GitHub API is reachable.",
+          "documentation": "You should only need to modify this if using GitHub Enterprise Server.",
+          "nullable": false,
+          "default": "https://api.github.com"
+        },
+        "proxy": {
+          "displayName": "Proxy",
+          "documentation": "Used for connection to GitHub.",
+          "type": {
+            "$ref": "#/types/proxy"
+          },
+          "nullable": true,
+          "metaData": {
+            "addItemButton": "Define proxy"
+          }
+        },
+        "authentication_method": {
+          "displayName": "GitHub authentication method",
+          "description": "App or PAT",
+          "type": {
+            "$ref": "#/enums/authentication_method"
+          },
+          "nullable": false,
+          "default": "PAT"
+        },
+        "useCredentialVault": {
+          "displayName": "Use credential vault for GitHub token authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "authentication_method",
+            "expectedValue": "PAT"
+          }
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for GitHub token authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "type": "secret",
+          "displayName": "Personal Access Token (PAT)",
+          "description": "",
+          "nullable": false,
+          "default": "",
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "EQUALS",
+                "property": "useCredentialVault",
+                "expectedValue": false
+              },
+              {
+                "type": "EQUALS",
+                "property": "authentication_method",
+                "expectedValue": "PAT"
+              }
+            ]
+          }
+        },
+        "client_id": {
+          "type": "text",
+          "displayName": "Client ID",
+          "description": "The client ID of your registered App.",
+          "nullable": false,
+          "default": "",
+          "precondition": {
+            "type": "EQUALS",
+            "property": "authentication_method",
+            "expectedValue": "APP"
+          }
+        },
+        "private_key": {
+          "displayName": "",
+          "type": {
+            "$ref": "#/types/private_key"
+          },
+          "precondition": {
+            "type": "EQUALS",
+            "property": "authentication_method",
+            "expectedValue": "APP"
+          }
+        },
+        "all_repositories": {
+          "displayName": "Collect alerts for all repositories",
+          "documentation": "This will affect the collection of repository level data such as Dependabot alerts. \n\nSeveral factors influence whether a specific repository is accessible, as described below: \n\n**Authentication method** \n- Classic Personal Access Tokens (PATs) provide broad access: all repositories owned by the token's creator are accessible, regardless of the account or organization they belong to. \n - Apps will only be able to access the repositories under organizations where the App is installed\n\n**Permissions** \n- The permissions assigned to a token or GitHub App may restrict which repositories can be accessed.\n\n**Policies** \n- An organization's Personal Access Token policy may prevent specific tokens from accessing its repositories entirely.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "repositories": {
+          "displayName": "Repositories",
+          "description": "Partial matches are allowed to 'identify' multiple repositories",
+          "type": "list",
+          "items": {
+            "type": "text",
+            "displayName": "Repo filter"
+          },
+          "precondition": {
+            "type": "EQUALS",
+            "property": "all_repositories",
+            "expectedValue": false
+          },
+          "metadata": {
+            "addItemButton": "Add repository filter"
+          }
+        },
+        "collect_audit_logs": {
+          "displayName": "Collect audit log",
+          "documentation": "Classic Personal Access Tokens can collect the enterprise level audit log. Apps can collect the organization level audit log for any organizations where the App is installed.",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        "audit_log_enterprise": {
+          "displayName": "Audit log enterprise",
+          "description": "The enterprise the audit log will be collected for.",
+          "documentation": "This is the name of the enterprise you want to collect the audit log for. The Personal Access Token (Classic) used for GitHub authentication must be owned by an **admin** of this enterprise and requires the `read:audit_log` scope.",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "EQUALS",
+                "property": "collect_audit_logs",
+                "expectedValue": true
+              },
+              {
+                "type": "EQUALS",
+                "property": "authentication_method",
+                "expectedValue": "PAT"
+              }
+            ]
+          }
+        },
+        "all_organization_logs": {
+          "displayName": "Collect audit log for all organizations",
+          "description": "",
+          "documentation": "The configured GitHub App must be installed in an organization for it to be available.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true,
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "EQUALS",
+                "property": "collect_audit_logs",
+                "expectedValue": true
+              },
+              {
+                "type": "OR",
+                "preconditions": [
+                  {
+                    "type": "EQUALS",
+                    "property": "authentication_method",
+                    "expectedValue": "APP"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "organizations": {
+          "displayName": "Organizations",
+          "description": "Partial matches are allowed to 'identify' multiple organizations",
+          "type": "list",
+          "items": {
+            "type": "text",
+            "displayName": "Org filter"
+          },
+          "precondition": {
+            "type": "EQUALS",
+            "property": "all_organization_logs",
+            "expectedValue": false
+          },
+          "metadata": {
+            "addItemButton": "Add organization filter"
+          }
+        }
+      }
+    },
+    "advanced_options": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "audit_log_frequency_minutes": {
+          "displayName": "Audit log ingestion frequency",
+          "description": "The extension will fetch audit logs using the specified time period.",
+          "type": "integer",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "minutes"
+          }
+        },
+        "security_findings_frequency_hours": {
+          "displayName": "Security findings ingest frequency",
+          "description": "How often security findings such as Dependabot alerts will be collected.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "exposed_secret_severity_level": {
+          "displayName": "Exposed secret severity level",
+          "description": "What severity level exposed secrets finding events will have (default: `High`).",
+          "type": {
+            "$ref": "#/enums/severity_level"
+          },
+          "nullable": true
+        },
+        "inclusion_time_window_days": {
+          "displayName": "Security events initial time window",
+          "description": "How far back to look for alerts during the initial run.",
+          "type": "float",
+          "nullable": false,
+          "default": 90,
+          "metadata": {
+            "suffix": "days"
+          }
+        },
+        "disable_cert_validation": {
+          "displayName": "Disable certificate validation",
+          "type": "boolean",
+          "nullable": true
+        },
+        "debug_logs": {
+          "displayName": "Enable extension debug logs",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "pythonRemote": {
+      "type": "object",
+      "displayName": "GitHub Advanced Security",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "github": {
+          "displayName": "GitHub configuration",
+          "type": {
+            "$ref": "#/types/github"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advanced_options": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advanced_options"
+          }
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "github_advanced_security configuration",
+  "schemaId": "python-extension.activation",
+  "displayName": "github_advanced_security configuration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": [
+    "tenant"
+  ],
+  "multiObject": false,
+  "properties": {
+    "pythonRemote": {
+      "displayName": "GitHub Advanced Security",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  },
+  "enums": {
+    "severity_level": {
+      "type": "enum",
+      "displayName": "Severity level",
+      "items": [
+        {
+          "displayName": "Critical",
+          "value": "CRITICAL"
+        },
+        {
+          "displayName": "High",
+          "value": "HIGH"
+        },
+        {
+          "displayName": "Medium",
+          "value": "MEDIUM"
+        },
+        {
+          "displayName": "Low",
+          "value": "LOW"
+        }
+      ]
+    },
+    "authentication_method": {
+      "type": "enum",
+      "Display": "Authentication method",
+      "items": [
+        {
+          "displayName": "GitHub App (Recommended)",
+          "value": "APP"
+        },
+        {
+          "displayName": "Personal Access Token (Classic)",
+          "value": "PAT"
+        }
+      ]
+    },
+    "key_method": {
+      "type": "enum",
+      "displayName": "Key method",
+      "items": [
+        {
+          "displayName": "Path to key file on ActiveGate",
+          "value": "PATH"
+        },
+        {
+          "displayName": "Key file contents",
+          "value": "CONTENTS"
+        }
+      ]
+    }
+  }
+}

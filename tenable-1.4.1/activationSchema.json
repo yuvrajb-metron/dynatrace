@@ -1,0 +1,252 @@
+{
+  "$schema": "https://artifactory.lab.dynatrace.org/artifactory/ruxit-cluster-release-local/com/dynatrace/configuration/configuration-core-schema-resources/0.615.0.20240306130838/configuration-core-schema-resources-0.615.0.20240306130838-sources.jar!/1/schema_strict_static.json",
+  "types": {
+    "pythonRemote": {
+      "type": "object",
+      "properties": {
+        "products": {
+          "displayName": "Choose the Tenable product to integrate:",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/products"
+          }
+        },
+        "connection": {
+          "displayName": "Connection",
+          "description": "For more information, see [Tenable-Provided Roles and Privileges](https://docs.tenable.com/vulnerability-management/Content/Settings/access-control/TenableRolePrivileges.htm)",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/connection"
+          }
+        },
+        "advancedOptions": {
+          "uiCustomization": {
+            "expandable": {
+              "sections": [
+                {
+                  "displayName": "Advanced options",
+                  "properties": [
+                    "fetchInfoVulnerabilities",
+                    "firstTimeFetchWindow",
+                    "vulnsFetchFrequency",
+                    "auditFetchFrequency",
+                    "debugLogs"
+                  ]
+                }
+              ]
+            }
+          },
+      "displayName": "Advanced options",
+      "nullable": false,
+      "type": {
+        "$ref": "#/types/advancedOptions"
+      }
+    }
+      }
+    },
+    "products": {
+      "displayName": "Choose the Tenable product to integrate:",
+      "summaryPattern": "",
+      "type": "object",
+      "properties": {
+        "vulnerabilityManagement": {
+          "displayName": "Tenable Vulnerability Management",
+          "description": "Ingest vulnerabilities and scan events from host scans.\n\nRequired user role: **Basic**",
+          "nullable": false,
+          "type": "boolean",
+          "default": true
+        },
+        "pciAsv": {
+          "displayName": "Tenable PCI ASV (plugin)",
+          "description": "Ingest vulnerabilities and scan events from PCI-based scans.\n\nRequired user role: **Basic**",
+          "nullable": true,
+          "type": "boolean"
+        },
+        "webAppScanning": {
+          "displayName": "Tenable Web App Scanning",
+          "description": "Ingest vulnerabilities and scan events from web application scans.\n\nRequired user role: **Basic**",
+          "nullable": true,
+          "type": "boolean"
+        },
+        "tenablePlatform": {
+          "displayName": "Tenable Platform",
+          "description": "Ingest Tenable Platform audit logs.\n\nRequired user role: **Administrator**",
+          "nullable": false,
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "connection": {
+      "displayName": "Connection",
+      "summaryPattern": "",
+      "type": "object",
+      "properties": {
+        "tenableUrl": {
+          "displayName": "Tenable API URL",
+          "type": "text",
+          "nullable": false,
+          "default": "https://cloud.tenable.com"
+        },
+        "accessKey": {
+          "displayName": "Tenable access key",
+          "description": "For more information, see [Generate API Keys](https://docs.tenable.com/vulnerability-management/Content/Settings/my-account/GenerateAPIKey.htm)",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Tenable access key with sufficient privileges"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "secretKey": {
+          "displayName": "Tenable secret key",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Tenable secret key with sufficient privileges"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "dynatraceUrl": {
+          "displayName": "Dynatrace security events endpoint",
+          "description": "For example: `https://env12345.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest)",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an OpenPipeline endpoint for security events ingest"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "NOT",
+            "precondition": {
+              "type": "EQUALS",
+              "property": "ingestAsLogs",
+              "expectedValue": true
+            }
+          }
+        },
+        "dynatraceAccessToken": {
+          "displayName": "Dynatrace access token",
+          "description": "Should have the `openpipeline.events_security` scope. For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token)",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "NOT",
+            "precondition": {
+              "type": "EQUALS",
+              "property": "ingestAsLogs",
+              "expectedValue": true
+            }
+          }
+        },
+        "ingestAsLogs": {
+          "displayName": "Ingest all data as logs instead of events.",
+          "description": "To be used only for Managed environments or for environments which do not have Grail enabled.",
+          "type": "boolean",
+          "nullable": true
+        }
+      }
+    },
+    "advancedOptions": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "fetchInfoVulnerabilities": {
+          "displayName": "Ingest INFO severity vulnerabilties.",
+          "description": "By default, only vulnerabilities with severity `LOW` or higher will be exported.",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        "firstTimeFetchWindow": {
+          "displayName": "First export time window",
+          "description": "The amount of time to look back for the first export. Note that the first export runs every time the extension is restarted.",
+          "type": "float",
+          "nullable": false,
+          "default": 12,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "vulnsFetchFrequency": {
+          "displayName": "Vulnerability management ingest frequency",
+          "description": "The integration will fetch vulnerability findings and scan events periodically using the specified time period.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "auditFetchFrequency": {
+          "displayName": "Audit log ingest frequency",
+          "description": "The integration will fetch Tenable audit logs periodically using the specified time period.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "debugLogs": {
+          "displayName": "Enable extension debug logs",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "appsec_tenable configuration",
+  "schemaId": "python-extension.activation",
+  "displayName": "appsec_tenable configuration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": [
+    "tenant"
+  ],
+  "multiObject": false,
+  "properties": {
+    "pythonRemote": {
+      "displayName": "Python Remote Extension",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  }
+}

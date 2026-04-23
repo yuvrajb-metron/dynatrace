@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: github-advanced-security
+Version: 1.2.4
+Summary: Github_advanced_security python EF2 extension
+Author: Dynatrace
+Requires-Python: >=3.10
+Requires-Dist: dt-extensions-sdk
+Requires-Dist: requests
+Requires-Dist: pyjwt
+Requires-Dist: cryptography
+Requires-Dist: pycountry
+Provides-Extra: dev
+Requires-Dist: dt-extensions-sdk[cli]; extra == "dev"
+

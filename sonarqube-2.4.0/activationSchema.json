@@ -1,0 +1,411 @@
+{
+  "$schema": "https://artifactory.lab.dynatrace.org/artifactory/ruxit-cluster-release-local/com/dynatrace/configuration/configuration-core-schema-resources/0.615.0.20240306130838/configuration-core-schema-resources-0.615.0.20240306130838-sources.jar!/1/schema_strict_static.json",
+  "types": {
+    "pythonRemote": {
+      "type": "object",
+      "properties": {
+        "products":{
+          "displayName": "Choose data to bring in:",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/products"
+          }
+        },
+        "sonarqube": {
+          "displayName": "Sonarqube configuration",
+          "type": {
+            "$ref": "#/types/sonarqube"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advancedOptions": {
+          "uiCustomization": {
+            "expandable": {
+              "sections": [
+                {
+                  "displayName": "Advanced options",
+                  "properties": [
+                    "fetchInfoVulnerabilities",
+                    "firstTimeFetchWindow",
+                    "eventFetchFrequency",
+                    "metricFetchFrequency",
+                    "auditFetchFrequency",
+                    "debugLogs"
+                  ]
+                }
+              ]
+            }
+          },
+          "displayName": "Advanced options",
+          "nullable": false,
+          "type": {
+            "$ref": "#/types/advancedOptions"
+          }
+        }
+      }
+    },
+    "products": {
+      "displayName": "Choose data to bring in:",
+      "description": "",
+      "summaryPattern": "",
+      "type": "object",
+      "properties": {
+        "fetchEvents": {
+          "displayName": "Fetch vulnerability findings and scan events",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "fetchSDLC": {
+          "displayName": "Fetch SDLC events",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "fetchMetrics": {
+          "displayName": "Fetch metrics",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "fetchAuditLogs": {
+          "displayName": "Fetch audit logs",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "summaryPattern": "",
+      "description": "",
+      "properties": {
+        "sonarqube": {
+          "displayName": "Sonarqube configuration",
+          "type": {
+            "$ref": "#/types/sonarqube"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        }
+      }
+    },
+    "sonarqube": {
+      "type": "object",
+      "displayName": "Sonarqube",
+      "properties": {
+        "sonarQubeUrl": {
+          "displayName": "SonarQube base URL",
+          "description": "Base URL for your SonarQube instance.",
+          "documentation": "For example: `https://sonarcloud.io` for cloud instances or `https://{mytenant}-sonarqube.{mydomain}.io` for local instances.",
+          "type": "text",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide your SonarQube base URL"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+         "verify_certificate": {
+          "displayName": "Verify SonarQube certificate",
+          "description": "Disable to skip verification of the SonarQube certificate.",
+          "nullable": true,
+          "type": "boolean"
+        },
+        "ca_location": {
+          "displayName": "CA certificate bundle location",
+          "description": "Location of the CA certificate bundle file to use for verification. If left empty, the default `certifi` CA bundle will be used.",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          ],
+           "precondition": {
+            "expectedValue": true,
+            "property": "verify_certificate",
+            "type": "EQUALS"
+          }
+        },
+        "sonarQubeApiToken": {
+          "displayName": "SonarQube API token",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "SonarQube API token with sufficient privileges"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ]
+        },
+        "sonarqubeCloud": {
+          "displayName": "Sonarqube Cloud",
+          "description": "Enable if the environment to monitor is a [Sonarqube Cloud](https://docs.sonarsource.com/sonarqube-cloud) instance.",
+          "type": "boolean",
+          "nullable": true
+        },
+        "sonarqubeOrganization": {
+          "displayName": "Sonarqube Organization",
+          "description": "The ID of the [SonarQube organization](https://docs.sonarsource.com/sonarqube-cloud/getting-started/viewing-organizations) to monitor.",
+          "documentation": "Should be the organization's ID (for example `dynatraceappsecdemo`), not the name (for example `DynatraceAppSecDemo`).",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "sonarqubeCloud",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace",
+      "properties": {
+        "useCredentialVault": {
+          "displayName": "Use credential vault for Dynatrace authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for Dynatrace authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "displayName": "Dynatrace API access token",
+          "description": "For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": false
+          }
+        },
+        "use_custom_security_ingest_url": {
+          "type": "boolean",
+          "displayName": "Use custom security events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/security.events` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatrace_security_ingest_url": {
+          "displayName": "Dynatrace security events endpoint",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest)",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_custom_security_ingest_url",
+            "expectedValue": true
+          }
+        },
+        "use_custom_sdlc_ingest_url": {
+          "type": "boolean",
+          "displayName": "Use custom SDLC events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/events.sdlc` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatrace_sdlc_ingest_url": {
+          "displayName": "Dynatrace SDLC events endpoint",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/events.sdlc`. For more information, see [SDLC events ingest](https://docs.dynatrace.com/docs/deliver/pipeline-observability-sdlc-events/sdlc-events)",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_custom_sdlc_ingest_url",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "advancedOptions": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "fetchInfoVulnerabilities": {
+          "displayName": "Ingest INFO severity vulnerabilties.",
+          "description": "By default, only vulnerabilities with severity `LOW` or higher will be exported.",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        "firstTimeFetchWindow": {
+          "displayName": "First ingest time window",
+          "description": "The amount of time to look back for the first events and audit log export. Note that the first export runs every time the extension is restarted.",
+          "type": "float",
+          "nullable": false,
+          "default": 12,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "eventFetchFrequency": {
+          "displayName": "Events and metrics ingest frequency",
+          "description": "The integration will fetch security and SDLC events periodically using the specified time period. Defaults to 1 hour.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "metricFetchFrequency": {
+          "displayName": "Metric ingest frequency",
+          "description": "The integration will fetch metrics periodically using the specified time period. Defaults to 60 minutes.",
+          "type": "float",
+          "nullable": false,
+          "default": 60,
+          "metadata": {
+            "suffix": "minutes"
+          }
+        },
+        "auditFetchFrequency": {
+          "displayName": "Audit logs ingest frequency",
+          "description": "The integration will fetch audit logs periodically using the specified time period. Defaults to 60 minutes.",
+          "type": "float",
+          "nullable": false,
+          "default": 60,
+          "metadata": {
+            "suffix": "minutes"
+          }
+        },
+        "sonarqubeProxy": {
+          "displayName": "Proxy",
+          "documentation": "\r\nIf your ActiveGate requires a proxy to connect to your Sonarqube environment, please provide it here.",
+          "nullable": true,
+          "type": {
+            "$ref": "#/types/proxy"
+          },
+          "metaData": {
+            "addItemButton": "Define proxy"
+          }
+        },
+        "debugLogs": {
+          "displayName": "Enable extension debug logs",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "displayName": "Proxy",
+      "summaryPattern": "Proxy {address}",
+      "properties": {
+        "address": {
+          "type": "text",
+          "displayName": "Address",
+          "description": "Proxy address, for example: \n\n* http://proxy.example.com:8080\n* https://proxy.example.com:9091",
+          "nullable": false,
+          "default": "",
+          "constraints": [
+            {
+              "type": "NOT_EMPTY"
+            }
+          ]
+        },
+        "username": {
+          "type": "text",
+          "displayName": "Proxy username",
+          "nullable": true
+        },
+        "password": {
+          "type": "secret",
+          "displayName": "Proxy password",
+          "nullable": true
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "SonarQube Quality Metrics Ingest",
+  "schemaId": "python-extension.activation",
+  "displayName": "SonarQube Quality Metrics Ingest",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": [
+    "tenant"
+  ],
+  "multiObject": false,
+  "properties": {
+    "pythonRemote": {
+      "displayName": "Python Remote Extension",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      },
+      "default": {}
+    }
+  }
+}

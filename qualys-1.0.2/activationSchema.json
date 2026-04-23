@@ -1,0 +1,354 @@
+{
+  "types": {
+    "features": {
+      "type": "object",
+      "displayName": "Choose modules to integrate:",
+      "properties": {
+        "collect_vmdr_alerts": {
+          "displayName": "Collect Vulnerability Management, Detection & Response alerts",
+          "documentation": "This will include VMDR scans as well as those run from the Cloud Agent.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        "collect_admin_audit_logs": {
+          "displayName": "Collect activity logs",
+          "documentation": "This will collect activity logs across Qualys modules.",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "displayName": "Proxy",
+      "summaryPattern": "Proxy {address}",
+      "properties": {
+        "address": {
+          "type": "text",
+          "displayName": "Proxy address",
+          "description": "Proxy address, examples: \n\n* http://proxy.example.com:8080\n* https://proxy.example.com:9091",
+          "nullable": false,
+          "default": "",
+          "constraints": [
+            {
+              "type": "NOT_EMPTY"
+            }
+          ]
+        },
+        "username": {
+          "type": "text",
+          "displayName": "Proxy username",
+          "nullable": true
+        },
+        "password": {
+          "type": "secret",
+          "displayName": "Proxy password",
+          "nullable": true
+        }
+      }
+    },
+    "dynatrace": {
+      "type": "object",
+      "displayName": "Dynatrace",
+      "properties": {
+        "useCredentialVault": {
+          "displayName": "Use credential vault for Dynatrace authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for Dynatrace authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "TOKEN",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        },
+        "token": {
+          "displayName": "Dynatrace API access token",
+          "description": "For more information, see [Generate an access token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/access-tokens#create-api-token).",
+          "type": "secret",
+          "nullable": false,
+          "default": "",
+          "metadata": {
+            "placeholder": "Provide an access token with the openpipeline.events_security scope"
+          },
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": false
+          }
+        },
+        "use_custom_security_ingest_url": {
+          "type": "boolean",
+          "displayName": "Use custom security events ingest endpoint",
+          "description": "By default, `/platform/ingest/v1/security.events` will be used.",
+          "nullable": false,
+          "default": false
+        },
+        "dynatrace_security_ingest_url": {
+          "displayName": "(Optional) Dynatrace security events endpoint",
+          "description": "If not set, the default endpoint is used.",
+          "documentation": "For example: `https://<yourEnvironmentID>.live.dynatrace.com/platform/ingest/v1/security.events`. For more information, see [Security events ingest](https://docs.dynatrace.com/docs/secure/threat-observability/security-events-ingest)",
+          "type": "text",
+          "nullable": true,
+          "constraints": [
+            {
+              "type": "LENGTH",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          ],
+          "precondition": {
+            "type": "EQUALS",
+            "property": "use_custom_security_ingest_url",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "qualys": {
+      "type": "object",
+      "displayName": "GitHub configuration",
+      "properties": {
+        "url_base": {
+          "type": "text",
+          "displayName": "API URL Base",
+          "description": "The base URL where the Qualys API is available for your account's Qualys platform",
+          "documentation": "Refer to the Qualys documentation for how to identify your [Qualys platform and the appropriate API URL](https://www.qualys.com/platform-identification/).\n For example, if you are in the US2 platform you should enter `https://qualysapi.qg2.apps.qualys.com`.",
+          "nullable": false,
+          "default": "https://"
+        },
+        "private_platform": {
+          "type": "boolean",
+          "displayName": "Private Platform",
+          "documentation": "If you are a connecting to a Private Platform make sure this is checked. There are differences in some of the API calls made.",
+          "nullable": true
+        },
+        "proxy": {
+          "displayName": "Proxy",
+          "documentation": "Used for connection to GitHub.",
+          "type": {
+            "$ref": "#/types/proxy"
+          },
+          "nullable": true,
+          "metaData": {
+            "addItemButton": "Define proxy"
+          }
+        },
+        "username": {
+          "type": "text",
+          "displayName": "Username",
+          "nullable": false,
+          "default": "",
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "EQUALS",
+                "property": "useCredentialVault",
+                "expectedValue": false
+              }
+            ]
+          }
+        },
+        "password": {
+          "type": "secret",
+          "displayName": "Password",
+          "nullable": false,
+          "default": "",
+          "precondition": {
+            "type": "AND",
+            "preconditions": [
+              {
+                "type": "EQUALS",
+                "property": "useCredentialVault",
+                "expectedValue": false
+              }
+            ]
+          }
+        },
+        "useCredentialVault": {
+          "displayName": "Use credential vault for Qualys user authentication",
+          "type": "boolean",
+          "nullable": false,
+          "default": false,
+          "maxObjects": 1
+        },
+        "credentialVaultId": {
+          "displayName": "Select vault credential for Qualys user authentication",
+          "nullable": true,
+          "type": "text",
+          "subType": "credential",
+          "referencedType": "USERNAME_PASSWORD",
+          "maxObjects": 1,
+          "precondition": {
+            "type": "EQUALS",
+            "property": "useCredentialVault",
+            "expectedValue": true
+          }
+        }
+      }
+    },
+    "advanced_options": {
+      "type": "object",
+      "displayName": "Advanced options",
+      "summaryPattern": "",
+      "properties": {
+        "audit_log_frequency_minutes": {
+          "displayName": "Activity log ingestion frequency",
+          "description": "The extension will fetch activity logs using the specified time period.",
+          "type": "integer",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "minutes"
+          }
+        },
+        "security_findings_frequency_hours": {
+          "displayName": "Security findings ingest frequency",
+          "description": "How often security findings will be collected.",
+          "type": "float",
+          "nullable": false,
+          "default": 1,
+          "metadata": {
+            "suffix": "hours"
+          }
+        },
+        "inclusion_time_window_days": {
+          "displayName": "Security events initial time window",
+          "description": "How far back to look for alerts during the initial run.",
+          "type": "float",
+          "nullable": false,
+          "default": 90,
+          "metadata": {
+            "suffix": "days"
+          }
+        },
+        "debug_logs": {
+          "displayName": "Enable extension debug logs",
+          "type": "boolean",
+          "nullable": true
+        }
+      }
+    },
+    "pythonRemote": {
+      "type": "object",
+      "displayName": "Qualys Vulnerability Management, Detection & Response",
+      "properties": {
+        "features": {
+          "displayName": "Choose product to integrate:",
+          "type": {
+            "$ref": "#/types/features"
+          }
+        },
+        "qualys": {
+          "displayName": "Qualys configuration",
+          "type": {
+            "$ref": "#/types/qualys"
+          }
+        },
+        "dynatrace": {
+          "displayName": "Dynatrace configuration",
+          "type": {
+            "$ref": "#/types/dynatrace"
+          }
+        },
+        "advanced_options": {
+          "nullable": true,
+          "displayName": "Advanced options",
+          "type": {
+            "$ref": "#/types/advanced_options"
+          }
+        }
+      }
+    }
+  },
+  "dynatrace": "1",
+  "description": "github_advanced_security configuration",
+  "schemaId": "python-extension.activation",
+  "displayName": "github_advanced_security configuration",
+  "ownerProductManagement": "dynatrace",
+  "ownerDevelopment": "dynatrace",
+  "maturity": "GENERAL_AVAILABILITY",
+  "allowedScopes": [
+    "tenant"
+  ],
+  "multiObject": false,
+  "properties": {
+    "pythonRemote": {
+      "displayName": "GitHub Advanced Security",
+      "type": {
+        "$ref": "#/types/pythonRemote"
+      }
+    }
+  },
+  "enums": {
+    "severity_level": {
+      "type": "enum",
+      "displayName": "Severity level",
+      "items": [
+        {
+          "displayName": "Critical",
+          "value": "CRITICAL"
+        },
+        {
+          "displayName": "High",
+          "value": "HIGH"
+        },
+        {
+          "displayName": "Medium",
+          "value": "MEDIUM"
+        },
+        {
+          "displayName": "Low",
+          "value": "LOW"
+        }
+      ]
+    },
+    "authentication_method": {
+      "type": "enum",
+      "Display": "Authentication method",
+      "items": [
+        {
+          "displayName": "GitHub App (Recommended)",
+          "value": "APP"
+        },
+        {
+          "displayName": "Personal Access Token (Classic)",
+          "value": "PAT"
+        }
+      ]
+    },
+    "key_method": {
+      "type": "enum",
+      "displayName": "Key method",
+      "items": [
+        {
+          "displayName": "Path to key file on ActiveGate",
+          "value": "PATH"
+        },
+        {
+          "displayName": "Key file contents",
+          "value": "CONTENTS"
+        }
+      ]
+    }
+  }
+}

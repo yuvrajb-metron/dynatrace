@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: qualys-appsec
+Version: 1.0.2
+Summary: Qualys_appsec python EF2 extension
+Author: Dynatrace
+Requires-Python: >=3.10
+Requires-Dist: dt-extensions-sdk
+Requires-Dist: requests
+Provides-Extra: dev
+Requires-Dist: dt-extensions-sdk[cli]; extra == "dev"
+

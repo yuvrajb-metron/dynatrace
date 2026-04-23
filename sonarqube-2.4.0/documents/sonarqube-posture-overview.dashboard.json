@@ -1,0 +1,1168 @@
+{
+    "version": 20,
+    "variables": [
+        {
+            "version": 2,
+            "key": "TenantURL",
+            "type": "query",
+            "visible": true,
+            "editable": true,
+            "input": "timeseries { avg(sonarqube.code.lines) }, by: { tenant }\n| fields tenant\n| dedup tenant\n| sort tenant asc\n| append [data record(tenant=\"None\")]",
+            "multiple": true,
+            "defaultValue": [
+                "3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+            ]
+        },
+        {
+            "version": 2,
+            "key": "Projects",
+            "type": "query",
+            "visible": true,
+            "editable": true,
+            "input": "timeseries { avg(sonarqube.code.lines) }, by: { project }, \nfilter:{in(tenant,$TenantURL)}\n| fields project\n| dedup project\n| sort project asc\n| append [data record(project=\"None\")]",
+            "multiple": true,
+            "defaultValue": [
+                "3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*"
+            ]
+        }
+    ],
+    "tiles": {
+        "0": {
+            "title": "",
+            "type": "data",
+            "query": "fetch events\n| filter event.kind == \"SDLC_EVENT\"\n     AND event.status == \"finished\"\n     AND event.provider == \"SonarQube\"\n| filter in(sonarqube.project.id, $Projects)\n    AND in(sonarqube.tenant,$TenantURL)\n| fieldsAdd end_time=toTimestamp(end_time), start_time=toTimestamp(start_time)\n| fieldsAdd joinField=concat(toString(end_time),\":\",sonarqube.project.id)\n| join [\n    fetch security.events\n  | filter event.provider == \"SonarQube\"\n  | filter event.type == \"VULNERABILITY_SCAN\"\n  | filter in(sonarqube.project.id, $Projects)\n    AND in(sonarqube.tenant,$TenantURL)\n  | fieldsAdd joinField=concat(scan.time.completed,\":\",sonarqube.project.id)\n], on:{joinField}, \nfields:{\n  security.artifact.id=artifact.id\n}\n| fieldsAdd `Quality gate`=if(task.outcome==\"Success\",\"Passed\", else:\"Failed\")\n| summarize \nby: {    Scan=end_time, \n         Project=sonarqube.project.id,\n         `Quality gate`,\n         Description=event.description\n}, {`Scanned files`=countDistinctExact(security.artifact.id)}\n| dedup Scan\n| sort Scan desc",
+            "visualization": "table",
+            "visualizationSettings": {
+                "table": {
+                    "columnOrder": [
+                        "[\"Scan\"]",
+                        "[\"Quality gate\"]",
+                        "[\"Project\"]",
+                        "[\"Description\"]",
+                        "[\"Scanned files\"]"
+                    ],
+                    "hideColumnsForLargeResults": false,
+                    "columnWidths": {
+                        "[\"Project\"]": 469
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "Quality gate",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-status-ideal-default, #2f6862)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "Passed"
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-status-critical-default, #c62239)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "Failed"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "1": {
+            "title": "Vulnerabilities",
+            "type": "data",
+            "query": "timeseries Vulnerabilities=avg(sonarqube.code.vulnerabilities), interval: 1d, \nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}",
+            "visualization": "areaChart",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "chartSettings": {
+                    "truncationMode": "middle",
+                    "legend": {
+                        "hidden": true
+                    },
+                    "leftYAxisSettings": {
+                        "label": "sonarqube.bugs"
+                    },
+                    "xAxisLabel": "timeframe",
+                    "xAxisScaling": "analyzedTimeframe",
+                    "fieldMapping": {
+                        "leftAxisValues": [
+                            "Vulnerabilities"
+                        ],
+                        "timestamp": "timeframe"
+                    }
+                },
+                "dataMapping": {
+                    "displayedFields": [
+                        "Vulnerabilities"
+                    ]
+                },
+                "thresholds": []
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "2": {
+            "title": "Hotspots",
+            "type": "data",
+            "query": "timeseries Hotspots=avg(sonarqube.security.hotspots), interval: 1d, \nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n",
+            "visualization": "areaChart",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "chartSettings": {
+                    "truncationMode": "middle",
+                    "leftYAxisSettings": {
+                        "label": "sonarqube.bugs"
+                    },
+                    "xAxisLabel": "timeframe",
+                    "xAxisScaling": "analyzedTimeframe",
+                    "seriesOverrides": [
+                        {
+                            "seriesId": [
+                                "Reviewed"
+                            ],
+                            "override": {
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-vulnerability-status-resolved-default, #3e8e6a)"
+                                }
+                            }
+                        },
+                        {
+                            "seriesId": [
+                                "Active"
+                            ],
+                            "override": {
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-unacceptable-default, #cd3741)"
+                                }
+                            }
+                        }
+                    ],
+                    "fieldMapping": {
+                        "leftAxisValues": [
+                            "Hotspots"
+                        ],
+                        "timestamp": "timeframe"
+                    },
+                    "xAxisIsLabelVisible": true,
+                    "legend": {
+                        "hidden": true
+                    }
+                },
+                "dataMapping": {
+                    "displayedFields": [
+                        "Hotspots"
+                    ]
+                },
+                "thresholds": []
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "3": {
+            "title": "Bugs",
+            "type": "data",
+            "query": "timeseries Bugs=avg(sonarqube.code.bugs), interval: 1d, \nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}",
+            "visualization": "areaChart",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "chartSettings": {
+                    "truncationMode": "middle",
+                    "legend": {
+                        "hidden": true
+                    },
+                    "leftYAxisSettings": {
+                        "label": "sonarqube.bugs"
+                    },
+                    "xAxisLabel": "timeframe",
+                    "xAxisScaling": "analyzedTimeframe",
+                    "fieldMapping": {
+                        "leftAxisValues": [
+                            "Bugs"
+                        ],
+                        "timestamp": "timeframe"
+                    }
+                },
+                "dataMapping": {
+                    "displayedFields": [
+                        "Bugs"
+                    ]
+                },
+                "thresholds": []
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "4": {
+            "title": "Code smells",
+            "type": "data",
+            "query": "timeseries Smells=avg(sonarqube.code.smells), interval: 1d, \nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}",
+            "visualization": "areaChart",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "chartSettings": {
+                    "truncationMode": "middle",
+                    "legend": {
+                        "hidden": true
+                    },
+                    "leftYAxisSettings": {
+                        "label": "sonarqube.bugs"
+                    },
+                    "xAxisLabel": "timeframe",
+                    "xAxisScaling": "analyzedTimeframe",
+                    "fieldMapping": {
+                        "leftAxisValues": [
+                            "Smells"
+                        ],
+                        "timestamp": "timeframe"
+                    }
+                },
+                "dataMapping": {
+                    "displayedFields": [
+                        "Smells"
+                    ]
+                },
+                "thresholds": []
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "7": {
+            "title": "Maintainability",
+            "type": "data",
+            "query": "timeseries rating_max=max(sonarqube.maintainability.rating), \ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(rating_max)\n| fieldsAdd grade = if(idx == 1.00, \"A\", \n              else: if(idx == 2.00, \"B\", \n              else: if(idx == 3.00, \"C\", \n              else: if(idx == 4.0, \"D\", \n              else: \"E\"))))",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "grade",
+                    "trend": {
+                        "isVisible": true
+                    },
+                    "sparklineSettings": {
+                        "showContextValues": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "grade",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "A"
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "B"
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "C"
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-poor-default, #d56b1a)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "D"
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "E"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "9": {
+            "title": "Lines of code",
+            "type": "data",
+            "query": "timeseries code_lines=max(sonarqube.code.lines), interval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}",
+            "visualization": "areaChart",
+            "visualizationSettings": {
+                "chartSettings": {
+                    "truncationMode": "middle",
+                    "legend": {
+                        "hidden": true
+                    },
+                    "leftYAxisSettings": {
+                        "label": "sonarqube.bugs"
+                    },
+                    "xAxisLabel": "timeframe",
+                    "xAxisScaling": "analyzedTimeframe",
+                    "fieldMapping": {
+                        "leftAxisValues": [
+                            "code_lines"
+                        ],
+                        "timestamp": "timeframe"
+                    }
+                },
+                "dataMapping": {
+                    "displayedFields": [
+                        "code_lines"
+                    ]
+                },
+                "autoSelectVisualization": false,
+                "thresholds": []
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "10": {
+            "title": "Security",
+            "type": "data",
+            "query": "timeseries {security_max=max(sonarqube.security.rating)}, \ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(security_max)\n| fieldsAdd grade = if(idx == 1.00, \"A\", \n              else: if(idx == 2.00, \"B\", \n              else: if(idx == 3.00, \"C\", \n              else: if(idx == 4.0, \"D\", \n              else: \"E\"))))",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "grade",
+                    "sparklineSettings": {
+                        "showContextValues": true
+                    },
+                    "trend": {
+                        "isVisible": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "grade",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "A"
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "B"
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "C"
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "D"
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "E"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "11": {
+            "title": "Reliability",
+            "type": "data",
+            "query": "timeseries {reliability_max=max(sonarqube.reliability.rating)},\ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(reliability_max)\n| fieldsAdd grade = if(idx == 1.00, \"A\", \n              else: if(idx == 2.00, \"B\", \n              else: if(idx == 3.00, \"C\", \n              else: if(idx == 4.0, \"D\", \n              else: \"E\"))))",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "grade",
+                    "trend": {
+                        "isVisible": true
+                    },
+                    "sparklineSettings": {
+                        "showContextValues": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "grade",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "A"
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "B"
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "C"
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-poor-default, #d56b1a)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "D"
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "E"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "12": {
+            "title": "Hotspots reviewed",
+            "type": "data",
+            "query": "timeseries {hotspots_max=max(sonarqube.security.hotspots.reviewed)}, \ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(hotspots_max)\n| fieldsAdd grade = if(idx >= 80, \"A\", \n              else: if(idx >= 70, \"B\", \n              else: if(idx >= 50, \"C\", \n              else: if(idx >= 30, \"D\", \n              else: \"E\"))))",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "grade",
+                    "trend": {
+                        "isVisible": true
+                    },
+                    "sparklineSettings": {
+                        "showContextValues": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "grade",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "A"
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "B"
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "C"
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-poor-default, #d56b1a)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "D"
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "E"
+                            }
+                        ]
+                    }
+                ],
+                "unitsOverrides": [
+                    {
+                        "identifier": "idx",
+                        "unitCategory": "percentage",
+                        "baseUnit": "percent",
+                        "displayUnit": null,
+                        "decimals": 1,
+                        "suffix": "%",
+                        "delimiter": false,
+                        "added": 1752744520511
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "13": {
+            "title": "Scans over time",
+            "type": "data",
+            "query": "fetch events\n| filter event.kind == \"SDLC_EVENT\"\n     AND event.status == \"finished\"\n     AND event.provider == \"SonarQube\"\n| filter in(sonarqube.project.id, $Projects)\n    AND in(sonarqube.tenant,$TenantURL)\n| fieldsAdd end_time=toTimestamp(end_time)\n| summarize by:{end_time}, scans=count()\n| makeTimeseries Scans=sum(scans), time:end_time, interval:1d",
+            "visualization": "barChart",
+            "visualizationSettings": {
+                "chartSettings": {
+                    "legend": {
+                        "hidden": true
+                    }
+                },
+                "autoSelectVisualization": false,
+                "thresholds": []
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "14": {
+            "type": "markdown",
+            "content": "# SonarQube posture overview\n\nOverview of the security and quality findings reported by SonarQube. Learn more about [Security events ingest](https://dt-url.net/1d63p0v)."
+        },
+        "15": {
+            "type": "markdown",
+            "content": "### Ratings\nCurrent ratings for assessed projects, ranging from A (highest quality) to E (lowest)."
+        },
+        "16": {
+            "type": "markdown",
+            "content": "### Findings over time\nHistorical view of quality and security findings. Lower values indicate better results."
+        },
+        "17": {
+            "type": "markdown",
+            "content": "### Latest scans\nRecent SonarQube scans and their results."
+        },
+        "18": {
+            "title": "Duplicated lines density",
+            "type": "data",
+            "query": "timeseries {duplications_max=max(sonarqube.code.duplication)}, \ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(duplications_max)",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "idx",
+                    "trend": {
+                        "isVisible": true,
+                        "upward": {
+                            "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                        },
+                        "downward": {
+                            "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                        }
+                    },
+                    "sparklineSettings": {
+                        "showContextValues": true,
+                        "showTicks": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "idx",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "≤",
+                                "label": "",
+                                "value": 3
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "≤",
+                                "label": "",
+                                "value": 5
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "≤",
+                                "label": "",
+                                "value": 10
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-poor-default, #d56b1a)"
+                                },
+                                "comparator": "≤",
+                                "label": "",
+                                "value": 20
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": ">",
+                                "label": "",
+                                "value": 20
+                            }
+                        ]
+                    }
+                ],
+                "unitsOverrides": [
+                    {
+                        "identifier": "idx",
+                        "unitCategory": "percentage",
+                        "baseUnit": "percent",
+                        "displayUnit": null,
+                        "decimals": 1,
+                        "suffix": "%",
+                        "delimiter": false,
+                        "added": 1752744520511
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "19": {
+            "title": "Code size",
+            "type": "data",
+            "query": "timeseries {lines_max=max(sonarqube.code.lines)}, \ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(lines_max)\n| fieldsAdd grade = if(idx < 1000, \"XS\", \n              else: if(idx < 10000, \"S\", \n              else: if(idx < 100000, \"M\", \n              else: if(idx < 500000, \"L\", \n              else: \"XL\"))))",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "grade",
+                    "sparklineSettings": {
+                        "isVisible": false,
+                        "showContextValues": true
+                    },
+                    "trend": {
+                        "isVisible": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "grade",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "A"
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "B"
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "C"
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-security-risk-level-high-default, #cd3741)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "D"
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": "=",
+                                "label": "",
+                                "value": "E"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        },
+        "20": {
+            "title": "Test coverage",
+            "type": "data",
+            "query": "timeseries {coverage_max=max(sonarqube.code.coverage)}, \ninterval: 1d,\nfilter:{in(project, $Projects) and in(tenant,$TenantURL)}\n| fieldsAdd idx = arrayLast(coverage_max)",
+            "visualization": "singleValue",
+            "visualizationSettings": {
+                "autoSelectVisualization": false,
+                "singleValue": {
+                    "labelMode": "none",
+                    "label": "task.outcome",
+                    "recordField": "idx",
+                    "trend": {
+                        "isVisible": true,
+                        "upward": {
+                            "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                        },
+                        "downward": {
+                            "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                        }
+                    },
+                    "sparklineSettings": {
+                        "showContextValues": true,
+                        "showTicks": true
+                    }
+                },
+                "thresholds": [
+                    {
+                        "id": 1,
+                        "field": "idx",
+                        "title": "",
+                        "isEnabled": true,
+                        "rules": [
+                            {
+                                "id": 0,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-categorical-themed-blue-steel-color-03-default, #627cfe)"
+                                },
+                                "comparator": "≥",
+                                "label": "",
+                                "value": 80
+                            },
+                            {
+                                "id": 1,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-excellent-default, #2a7453)"
+                                },
+                                "comparator": "≥",
+                                "label": "",
+                                "value": 70
+                            },
+                            {
+                                "id": 2,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-fair-default, #a9780f)"
+                                },
+                                "comparator": "≥",
+                                "label": "",
+                                "value": 50
+                            },
+                            {
+                                "id": 3,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-apdex-poor-default, #d56b1a)"
+                                },
+                                "comparator": "≥",
+                                "label": "",
+                                "value": 30
+                            },
+                            {
+                                "id": 4,
+                                "color": {
+                                    "Default": "var(--dt-colors-charts-loglevel-emergency-default, #ae132d)"
+                                },
+                                "comparator": "<",
+                                "label": "",
+                                "value": 30
+                            }
+                        ]
+                    }
+                ],
+                "unitsOverrides": [
+                    {
+                        "identifier": "idx",
+                        "unitCategory": "percentage",
+                        "baseUnit": "percent",
+                        "displayUnit": null,
+                        "decimals": 1,
+                        "suffix": "%",
+                        "delimiter": false,
+                        "added": 1752744520511
+                    }
+                ]
+            },
+            "querySettings": {
+                "maxResultRecords": 1000,
+                "defaultScanLimitGbytes": 500,
+                "maxResultMegaBytes": 1,
+                "defaultSamplingRatio": 10,
+                "enableSampling": false
+            },
+            "davis": {
+                "enabled": false,
+                "davisVisualization": {
+                    "isAvailable": true
+                }
+            }
+        }
+    },
+    "layouts": {
+        "0": {
+            "x": 0,
+            "y": 26,
+            "w": 24,
+            "h": 10
+        },
+        "1": {
+            "x": 12,
+            "y": 19,
+            "w": 12,
+            "h": 5
+        },
+        "2": {
+            "x": 0,
+            "y": 19,
+            "w": 12,
+            "h": 5
+        },
+        "3": {
+            "x": 12,
+            "y": 14,
+            "w": 12,
+            "h": 5
+        },
+        "4": {
+            "x": 0,
+            "y": 14,
+            "w": 12,
+            "h": 5
+        },
+        "7": {
+            "x": 8,
+            "y": 7,
+            "w": 4,
+            "h": 5
+        },
+        "9": {
+            "x": 4,
+            "y": 2,
+            "w": 7,
+            "h": 3
+        },
+        "10": {
+            "x": 0,
+            "y": 7,
+            "w": 4,
+            "h": 5
+        },
+        "11": {
+            "x": 4,
+            "y": 7,
+            "w": 4,
+            "h": 5
+        },
+        "12": {
+            "x": 12,
+            "y": 7,
+            "w": 4,
+            "h": 5
+        },
+        "13": {
+            "x": 11,
+            "y": 2,
+            "w": 13,
+            "h": 3
+        },
+        "14": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 2
+        },
+        "15": {
+            "x": 0,
+            "y": 5,
+            "w": 24,
+            "h": 2
+        },
+        "16": {
+            "x": 0,
+            "y": 12,
+            "w": 24,
+            "h": 2
+        },
+        "17": {
+            "x": 0,
+            "y": 24,
+            "w": 24,
+            "h": 2
+        },
+        "18": {
+            "x": 16,
+            "y": 7,
+            "w": 4,
+            "h": 5
+        },
+        "19": {
+            "x": 0,
+            "y": 2,
+            "w": 4,
+            "h": 3
+        },
+        "20": {
+            "x": 20,
+            "y": 7,
+            "w": 4,
+            "h": 5
+        }
+    },
+    "importedWithCode": false,
+    "settings": {
+        "defaultTimeframe": {
+            "value": {
+                "from": "now()-7d",
+                "to": "now()"
+            },
+            "enabled": true
+        }
+    }
+}

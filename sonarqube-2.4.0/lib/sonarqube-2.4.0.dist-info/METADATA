@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: sonarqube
+Version: 2.4.0
+Summary: Sonarqube python EF2 extension
+Author: Dynatrace
+Requires-Python: >=3.10
+Requires-Dist: dt-extensions-sdk
+Requires-Dist: requests
+Requires-Dist: python-dateutil
+Requires-Dist: pydantic
+Provides-Extra: dev
+Requires-Dist: dt-extensions-sdk[cli]; extra == "dev"
+
